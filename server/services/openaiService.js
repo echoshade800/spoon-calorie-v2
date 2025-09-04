@@ -73,10 +73,32 @@ export class OpenAIService {
       
       // 尝试解析JSON响应
       try {
-        const foods = JSON.parse(content);
+        // 清理 markdown 代码块标记
+        let cleanContent = content.trim();
+        
+        // 移除可能的 markdown 代码块标记
+        if (cleanContent.startsWith('```json')) {
+          cleanContent = cleanContent.replace(/^```json\s*/, '');
+        }
+        if (cleanContent.startsWith('```')) {
+          cleanContent = cleanContent.replace(/^```\s*/, '');
+        }
+        if (cleanContent.endsWith('```')) {
+          cleanContent = cleanContent.replace(/\s*```$/, '');
+        }
+        
+        // 移除其他可能的格式标记
+        cleanContent = cleanContent.replace(/^json\s*/, '');
+        cleanContent = cleanContent.trim();
+        
+        console.log('清理后的内容:', cleanContent);
+        
+        const foods = JSON.parse(cleanContent);
         return Array.isArray(foods) ? foods : [];
       } catch (parseError) {
         console.error('解析OpenAI响应失败:', parseError);
+        console.error('原始内容:', content);
+        console.error('清理后内容:', cleanContent);
         // 如果解析失败，返回空数组
         return [];
       }
