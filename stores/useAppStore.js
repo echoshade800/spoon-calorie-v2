@@ -1,9 +1,26 @@
 /**
- * Global app state using Zustand
+ * Global app state using Zustand with MySQL backend
  * Manages user profile, diary entries, and app settings
  */
 import { create } from 'zustand';
-import { searchFoods, getFoodById, addCustomFood as addCustomFoodToDB, initializeDatabase } from '@/utils/database';
+import { 
+  searchFoods, 
+  getFoodById, 
+  addCustomFood as addCustomFoodToDB, 
+  initializeDatabase,
+  saveUserProfile,
+  getUserProfile,
+  saveDiaryEntry,
+  getDiaryEntries,
+  updateDiaryEntry as updateDiaryEntryInDB,
+  deleteDiaryEntry as deleteDiaryEntryFromDB,
+  saveExerciseEntry,
+  getExerciseEntries,
+  deleteExerciseEntry as deleteExerciseEntryFromDB,
+  saveMyMeal,
+  getMyMeals,
+  deleteMyMeal as deleteMyMealFromDB
+} from '@/utils/database';
 import { searchAllDataSources } from '@/utils/foodDataSync';
 
 export const useAppStore = create((set, get) => ({
@@ -27,23 +44,58 @@ export const useAppStore = create((set, get) => ({
   
   // UI State
   isLoading: false,
-  addScreenScrollPositions: {}, // New state to store scroll positions for AddScreen tabs
+  addScreenScrollPositions: {},
   isDatabaseReady: false,
   error: null,
 
   // Actions
-  setProfile: (profile) => set({ profile, isOnboarded: true }),
+  setProfile: async (profile) => {
+    try {
+      await saveUserProfile(profile);
+      set({ profile, isOnboarded: true });
+    } catch (error) {
+      console.error('Set profile error:', error);
+      throw error;
+    }
+  },
   
-  updateProfile: (updates) => set((state) => ({
-    profile: { ...state.profile, ...updates }
-  })),
+  updateProfile: async (updates) => {
+    try {
+      const currentProfile = get().profile;
+      const updatedProfile = { ...currentProfile, ...updates };
+      await saveUserProfile(updatedProfile);
+      set({ profile: updatedProfile });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      throw error;
+    }
+  },
   
   // Database initialization
   initializeApp: async () => {
     try {
       set({ isLoading: true });
       await initializeDatabase();
-      set({ isDatabaseReady: true, isLoading: false });
+      
+      // Load user profile
+      const profile = await getUserProfile();
+      if (profile) {
+        set({ profile, isOnboarded: true });
+      }
+      
+      // Load diary entries for current date
+      const selectedDate = get().selectedDate;
+      const entries = await getDiaryEntries(selectedDate);
+      const exercises = await getExerciseEntries(selectedDate);
+      const meals = await getMyMeals();
+      
+      set({ 
+        diaryEntries: entries,
+        exerciseEntries: exercises,
+        myMeals: meals,
+        isDatabaseReady: true, 
+        isLoading: false 
+      });
     } catch (error) {
       console.error('App initialization error:', error);
       set({ error: 'Failed to initialize database', isLoading: false });
@@ -93,35 +145,100 @@ export const useAppStore = create((set, get) => ({
     }
   },
   
-  setSelectedDate: (date) => set({ selectedDate: date }),
+  setSelectedDate: async (date) => {
+    try {
+      set({ selectedDate: date });
+      
+      // Load entries for new date
+      const entries = await getDiaryEntries(date);
+      const exercises = await getExerciseEntries(date);
+      
+      set({ 
+        diaryEntries: entries,
+        exerciseEntries: exercises
+      });
+    } catch (error) {
+      console.error('Set selected date error:', error);
+    }
+  },
   
-  addDiaryEntry: (entry) => set((state) => ({
-    diaryEntries: [...state.diaryEntries, { ...entry, id: Date.now().toString() }]
-  })),
+  addDiaryEntry: async (entry) => {
+    try {
+      const savedEntry = await saveDiaryEntry(entry);
+      set((state) => ({
+        diaryEntries: [...state.diaryEntries, savedEntry]
+      }));
+      return savedEntry;
+    } catch (error) {
+      console.error('Add diary entry error:', error);
+      throw error;
+    }
+  },
   
-  updateDiaryEntry: (id, updates) => set((state) => ({
-    diaryEntries: state.diaryEntries.map(entry => 
-      entry.id === id ? { ...entry, ...updates } : entry
-    )
-  })),
+  updateDiaryEntry: async (id, updates) => {
+    try {
+      await updateDiaryEntryInDB(id, updates);
+      set((state) => ({
+        diaryEntries: state.diaryEntries.map(entry => 
+          entry.id === id ? { ...entry, ...updates } : entry
+        )
+      }));
+    } catch (error) {
+      console.error('Update diary entry error:', error);
+      throw error;
+    }
+  },
   
-  deleteDiaryEntry: (id) => set((state) => ({
-    diaryEntries: state.diaryEntries.filter(entry => entry.id !== id)
-  })),
+  deleteDiaryEntry: async (id) => {
+    try {
+      await deleteDiaryEntryFromDB(id);
+      set((state) => ({
+        diaryEntries: state.diaryEntries.filter(entry => entry.id !== id)
+      }));
+    } catch (error) {
+      console.error('Delete diary entry error:', error);
+      throw error;
+    }
+  },
   
-  addExerciseEntry: (entry) => set((state) => ({
-    exerciseEntries: [...state.exerciseEntries, entry]
-  })),
+  addExerciseEntry: async (entry) => {
+    try {
+      const savedEntry = await saveExerciseEntry(entry);
+      set((state) => ({
+        exerciseEntries: [...state.exerciseEntries, savedEntry]
+      }));
+      return savedEntry;
+    } catch (error) {
+      console.error('Add exercise entry error:', error);
+      throw error;
+    }
+  },
   
-  updateExerciseEntry: (id, updates) => set((state) => ({
-    exerciseEntries: state.exerciseEntries.map(entry => 
-      entry.id === id ? { ...entry, ...updates } : entry
-    )
-  })),
+  updateExerciseEntry: async (id, updates) => {
+    try {
+      // TODO: Implement updateExerciseEntry in database.js
+      set((state) => ({
+        exerciseEntries: state.exerciseEntries.map(entry => 
+          entry.id === id ? { ...entry, ...updates } : entry
+        )
+      }));
+    } catch (error) {
+      console.error('Update exercise entry error:', error);
+      throw error;
+    }
+  },
   
-  deleteExerciseEntry: (id) => set((state) => ({
-    exerciseEntries: state.exerciseEntries.filter(entry => entry.id !== id)
-  })),
+  deleteExerciseEntry: async (id) => {
+    try {
+      await deleteExerciseEntryFromDB(id);
+      set((state) => ({
+        exerciseEntries: state.exerciseEntries.filter(entry => entry.id !== id)
+      }));
+    } catch (error) {
+      console.error('Delete exercise entry error:', error);
+      throw error;
+    }
+  },
   
   addCustomFood: async (food) => {
     try {
@@ -136,54 +253,59 @@ export const useAppStore = create((set, get) => ({
     }
   },
   
-  addMyMeal: (meal) => set((state) => ({
-    myMeals: [...state.myMeals, meal]
-  })),
-  
-  deleteMyMeal: (mealId) => set((state) => ({
-    myMeals: state.myMeals.filter(meal => meal.id !== mealId)
-  })),
-  
-  addMyFood: async (food) => {
+  addMyMeal: async (meal) => {
     try {
-      console.log('Adding custom food:', food);
-      
-      // Ensure database is ready
-      const state = get();
-      if (!state.isDatabaseReady) {
-        console.log('Database not ready, initializing...');
-        await get().initializeApp();
-      }
-      
-      const newFood = await addCustomFoodToDB(food);
-      console.log('Food saved to database:', newFood);
-      
+      const savedMeal = await saveMyMeal(meal);
       set((state) => ({
-        myFoods: [...state.myFoods, newFood]
+        myMeals: [...state.myMeals, savedMeal]
       }));
-      
-      console.log('Food added to myFoods state');
-      console.log('Current myFoods count:', get().myFoods.length);
-      return newFood;
+      return savedMeal;
     } catch (error) {
-      console.error('Add my food error - Full details:', {
-        error: error.message,
-        stack: error.stack,
-        foodData: food,
-        isDatabaseReady: get().isDatabaseReady
-      });
+      console.error('Add my meal error:', error);
       throw error;
     }
   },
   
-  deleteMyFood: (foodId) => set((state) => ({
-    myFoods: state.myFoods.filter(food => food.id !== foodId)
-  })),
+  deleteMyMeal: async (mealId) => {
+    try {
+      await deleteMyMealFromDB(mealId);
+      set((state) => ({
+        myMeals: state.myMeals.filter(meal => meal.id !== mealId)
+      }));
+    } catch (error) {
+      console.error('Delete my meal error:', error);
+      throw error;
+    }
+  },
+  
+  addMyFood: async (food) => {
+    try {
+      const newFood = await addCustomFoodToDB(food);
+      set((state) => ({
+        myFoods: [...state.myFoods, newFood]
+      }));
+      return newFood;
+    } catch (error) {
+      console.error('Add my food error:', error);
+      throw error;
+    }
+  },
+  
+  deleteMyFood: async (foodId) => {
+    try {
+      // TODO: Implement deleteCustomFood in database.js
+      set((state) => ({
+        myFoods: state.myFoods.filter(food => food.id !== foodId)
+      }));
+    } catch (error) {
+      console.error('Delete my food error:', error);
+      throw error;
+    }
+  },
   
   setAddScreenScrollPosition: (tabId, position) => set((state) => ({
     addScreenScrollPositions: { ...state.addScreenScrollPositions, [tabId]: position }
   })),
-
 
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),

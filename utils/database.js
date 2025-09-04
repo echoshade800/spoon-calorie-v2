@@ -1,79 +1,214 @@
 /**
- * SQLite Database utilities for food data management
- * Handles Open Food Facts and USDA FoodData Central integration
+ * MySQL Database utilities for food data management
+ * Handles food database, user profiles, diary entries, and exercise data
  */
-import * as SQLite from 'expo-sqlite';
-import * as FileSystem from 'expo-file-system';
+import mysql from 'mysql2/promise';
 
-const DATABASE_NAME = 'foods.db';
-const DATABASE_VERSION = 1;
+const DB_CONFIG = {
+  host: 'vsa-db-dev.cb462qmg6ec1.us-east-1.rds.amazonaws.com',
+  port: 3306,
+  user: 'miniapp1',
+  password: 'miniapp@20251',
+  database: 'calorie',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  acquireTimeout: 60000,
+  timeout: 60000,
+};
 
-let db = null;
+let pool = null;
 
 /**
- * Initialize and open the SQLite database
+ * Initialize MySQL connection pool and create tables
  */
 export const initializeDatabase = async () => {
   try {
-    console.log('Initializing database...');
-    // Open or create database
-    db = await SQLite.openDatabaseAsync(DATABASE_NAME);
-    console.log('Database opened successfully');
+    console.log('Initializing MySQL database connection...');
     
-    // Create foods table if it doesn't exist
-    console.log('Creating foods table...');
-    await db.execAsync(`
+    // Create connection pool
+    pool = mysql.createPool(DB_CONFIG);
+    
+    // Test connection
+    const connection = await pool.getConnection();
+    console.log('MySQL connection established successfully');
+    connection.release();
+    
+    // Create tables
+    await createTables();
+    
+    // Insert sample data if needed
+    await insertSampleDataIfNeeded();
+    
+    console.log('Database initialized successfully');
+    return pool;
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create all necessary tables
+ */
+const createTables = async () => {
+  try {
+    console.log('Creating database tables...');
+    
+    // Foods table
+    await pool.execute(`
       CREATE TABLE IF NOT EXISTS foods (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        brand TEXT,
-        kcal_per_100g REAL NOT NULL,
-        carbs_per_100g REAL DEFAULT 0,
-        protein_per_100g REAL DEFAULT 0,
-        fat_per_100g REAL DEFAULT 0,
-        fiber_per_100g REAL DEFAULT 0,
-        sugar_per_100g REAL DEFAULT 0,
-        sodium_per_100g REAL DEFAULT 0,
-        serving_label TEXT,
-        grams_per_serving REAL,
-        source TEXT NOT NULL,
-        barcode TEXT,
-        category TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(500) NOT NULL,
+        brand VARCHAR(255),
+        kcal_per_100g DECIMAL(8,2) NOT NULL,
+        carbs_per_100g DECIMAL(8,2) DEFAULT 0,
+        protein_per_100g DECIMAL(8,2) DEFAULT 0,
+        fat_per_100g DECIMAL(8,2) DEFAULT 0,
+        fiber_per_100g DECIMAL(8,2) DEFAULT 0,
+        sugar_per_100g DECIMAL(8,2) DEFAULT 0,
+        sodium_per_100g DECIMAL(8,2) DEFAULT 0,
+        serving_label VARCHAR(255),
+        grams_per_serving DECIMAL(8,2),
+        source VARCHAR(50) NOT NULL,
+        barcode VARCHAR(255),
+        category VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_foods_name (name),
+        INDEX idx_foods_brand (brand),
+        INDEX idx_foods_barcode (barcode),
+        INDEX idx_foods_source (source)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
-    console.log('Foods table created/verified');
 
-    // Create indexes for faster searching
-    console.log('Creating database indexes...');
-    await db.execAsync(`
-      CREATE INDEX IF NOT EXISTS idx_foods_name ON foods(name);
-      CREATE INDEX IF NOT EXISTS idx_foods_brand ON foods(brand);
-      CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode);
-      CREATE INDEX IF NOT EXISTS idx_foods_source ON foods(source);
+    // User profiles table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id VARCHAR(255) PRIMARY KEY,
+        sex ENUM('male', 'female') NOT NULL,
+        age INT NOT NULL,
+        height_cm DECIMAL(5,2) NOT NULL,
+        weight_kg DECIMAL(5,2) NOT NULL,
+        activity_level VARCHAR(50) NOT NULL,
+        goal_type VARCHAR(50) NOT NULL,
+        rate_kcal_per_day INT DEFAULT 0,
+        calorie_goal INT NOT NULL,
+        macro_c INT DEFAULT 45,
+        macro_p INT DEFAULT 25,
+        macro_f INT DEFAULT 30,
+        bmr INT,
+        tdee INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
-    console.log('Database indexes created');
 
-    // Insert sample data if table is empty
-    console.log('Checking if sample data needs to be inserted...');
-    const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM foods');
-    console.log('Current food count in database:', result.count);
-    if (result.count === 0) {
+    // Diary entries table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS diary_entries (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) DEFAULT 'default_user',
+        date DATE NOT NULL,
+        meal_type ENUM('breakfast', 'lunch', 'dinner', 'snack') NOT NULL,
+        food_id VARCHAR(255),
+        food_name VARCHAR(500) NOT NULL,
+        custom_name VARCHAR(500),
+        amount DECIMAL(8,2) NOT NULL,
+        unit VARCHAR(100) NOT NULL,
+        source VARCHAR(50) NOT NULL,
+        kcal DECIMAL(8,2) NOT NULL,
+        carbs DECIMAL(8,2) DEFAULT 0,
+        protein DECIMAL(8,2) DEFAULT 0,
+        fat DECIMAL(8,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_diary_user_date (user_id, date),
+        INDEX idx_diary_meal_type (meal_type),
+        FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Exercise entries table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS exercise_entries (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) DEFAULT 'default_user',
+        date DATE NOT NULL,
+        time TIME,
+        category ENUM('cardio', 'strength') NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        duration_min INT NOT NULL,
+        calories INT NOT NULL,
+        distance DECIMAL(8,2),
+        sets INT,
+        reps INT,
+        weight DECIMAL(8,2),
+        notes TEXT,
+        met_value DECIMAL(4,2),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_exercise_user_date (user_id, date),
+        INDEX idx_exercise_category (category)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // My meals table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS my_meals (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) DEFAULT 'default_user',
+        name VARCHAR(255) NOT NULL,
+        photo_url TEXT,
+        total_kcal INT NOT NULL,
+        total_carbs DECIMAL(8,2) DEFAULT 0,
+        total_protein DECIMAL(8,2) DEFAULT 0,
+        total_fat DECIMAL(8,2) DEFAULT 0,
+        directions TEXT,
+        source VARCHAR(50) DEFAULT 'custom',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_my_meals_user (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // My meal items table
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS my_meal_items (
+        id VARCHAR(255) PRIMARY KEY,
+        meal_id VARCHAR(255) NOT NULL,
+        food_id VARCHAR(255),
+        name VARCHAR(255) NOT NULL,
+        amount DECIMAL(8,2) NOT NULL,
+        unit VARCHAR(100) NOT NULL,
+        calories INT NOT NULL,
+        carbs DECIMAL(8,2) DEFAULT 0,
+        protein DECIMAL(8,2) DEFAULT 0,
+        fat DECIMAL(8,2) DEFAULT 0,
+        sort_order INT DEFAULT 0,
+        FOREIGN KEY (meal_id) REFERENCES my_meals(id) ON DELETE CASCADE,
+        FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
+        INDEX idx_meal_items_meal (meal_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    console.log('All database tables created successfully');
+  } catch (error) {
+    console.error('Error creating tables:', error);
+    throw error;
+  }
+};
+
+/**
+ * Insert sample data if tables are empty
+ */
+const insertSampleDataIfNeeded = async () => {
+  try {
+    // Check if foods table has data
+    const [rows] = await pool.execute('SELECT COUNT(*) as count FROM foods');
+    if (rows[0].count === 0) {
       console.log('Inserting sample foods...');
       await insertSampleFoods();
-      console.log('Sample foods inserted');
     }
-
-    console.log('Database initialized successfully');
-    return db;
   } catch (error) {
-    console.error('Database initialization error - Full details:', {
-      error: error.message,
-      stack: error.stack,
-      databaseName: DATABASE_NAME
-    });
-    throw error;
+    console.error('Error checking/inserting sample data:', error);
   }
 };
 
@@ -303,8 +438,8 @@ const insertSampleFoods = async () => {
 
   try {
     for (const food of sampleFoods) {
-      await db.runAsync(
-        `INSERT OR REPLACE INTO foods (
+      await pool.execute(
+        `INSERT IGNORE INTO foods (
           id, name, brand, kcal_per_100g, carbs_per_100g, protein_per_100g, 
           fat_per_100g, fiber_per_100g, sugar_per_100g, sodium_per_100g,
           serving_label, grams_per_serving, source, barcode, category
@@ -338,14 +473,14 @@ const insertSampleFoods = async () => {
  * Search foods in the database
  */
 export const searchFoods = async (query, limit = 20) => {
-  if (!db) {
+  if (!pool) {
     await initializeDatabase();
   }
 
   try {
     if (!query || query.trim().length === 0) {
       // Return popular/common foods when no query
-      const result = await db.getAllAsync(
+      const [rows] = await pool.execute(
         `SELECT * FROM foods 
          WHERE source IN ('USDA', 'OFF') 
          ORDER BY 
@@ -357,11 +492,11 @@ export const searchFoods = async (query, limit = 20) => {
          LIMIT ?`,
         [limit]
       );
-      return result || [];
+      return rows || [];
     }
 
     const searchTerm = `%${query.toLowerCase()}%`;
-    const result = await db.getAllAsync(
+    const [rows] = await pool.execute(
       `SELECT * FROM foods 
        WHERE (LOWER(name) LIKE ? OR LOWER(brand) LIKE ? OR barcode = ?)
        ORDER BY 
@@ -376,7 +511,7 @@ export const searchFoods = async (query, limit = 20) => {
       [searchTerm, searchTerm, query, query, `${query.toLowerCase()}%`, searchTerm, limit]
     );
     
-    return result || [];
+    return rows || [];
   } catch (error) {
     console.error('Search foods error:', error);
     return [];
@@ -387,13 +522,13 @@ export const searchFoods = async (query, limit = 20) => {
  * Get food by ID
  */
 export const getFoodById = async (id) => {
-  if (!db) {
+  if (!pool) {
     await initializeDatabase();
   }
 
   try {
-    const result = await db.getFirstAsync('SELECT * FROM foods WHERE id = ?', [id]);
-    return result;
+    const [rows] = await pool.execute('SELECT * FROM foods WHERE id = ?', [id]);
+    return rows[0] || null;
   } catch (error) {
     console.error('Get food by ID error:', error);
     return null;
@@ -401,46 +536,17 @@ export const getFoodById = async (id) => {
 };
 
 /**
- * Get foods by category
- */
-export const getFoodsByCategory = async (category, limit = 50) => {
-  if (!db) {
-    await initializeDatabase();
-  }
-
-  try {
-    const result = await db.getAllAsync(
-      'SELECT * FROM foods WHERE category = ? ORDER BY name ASC LIMIT ?',
-      [category, limit]
-    );
-    return result || [];
-  } catch (error) {
-    console.error('Get foods by category error:', error);
-    return [];
-  }
-};
-
-/**
  * Add custom food to database
  */
 export const addCustomFood = async (foodData) => {
-  if (!db) {
-    console.log('Database not initialized, initializing now...');
+  if (!pool) {
     await initializeDatabase();
   }
 
   try {
-    console.log('Adding custom food with data:', foodData);
     const id = `custom_${Date.now()}`;
-    console.log('Generated ID:', id);
     
-    // Validate required fields
-    if (!foodData.name || !foodData.kcal_per_100g) {
-      throw new Error('Missing required fields: name and kcal_per_100g are required');
-    }
-    
-    console.log('Executing SQL insert...');
-    await db.runAsync(
+    await pool.execute(
       `INSERT INTO foods (
         id, name, brand, kcal_per_100g, carbs_per_100g, protein_per_100g, 
         fat_per_100g, serving_label, grams_per_serving, source, category
@@ -460,24 +566,386 @@ export const addCustomFood = async (foodData) => {
       ]
     );
     
-    console.log('SQL insert completed successfully');
-    
-    const savedFood = {
+    return {
       ...foodData, 
       id,
       source: 'CUSTOM',
       category: foodData.category || 'Custom'
     };
-    
-    console.log('Returning saved food:', savedFood);
-    return savedFood;
   } catch (error) {
-    console.error('Add custom food error - Full details:', {
-      error: error.message,
-      stack: error.stack,
-      foodData: foodData,
-      databaseState: db ? 'initialized' : 'not initialized'
-    });
+    console.error('Add custom food error:', error);
+    throw error;
+  }
+};
+
+/**
+ * User Profile Operations
+ */
+export const saveUserProfile = async (profileData) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    const userId = 'default_user'; // For single user app
+    
+    await pool.execute(
+      `INSERT INTO user_profiles (
+        id, sex, age, height_cm, weight_kg, activity_level, goal_type,
+        rate_kcal_per_day, calorie_goal, macro_c, macro_p, macro_f, bmr, tdee
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        sex = VALUES(sex),
+        age = VALUES(age),
+        height_cm = VALUES(height_cm),
+        weight_kg = VALUES(weight_kg),
+        activity_level = VALUES(activity_level),
+        goal_type = VALUES(goal_type),
+        rate_kcal_per_day = VALUES(rate_kcal_per_day),
+        calorie_goal = VALUES(calorie_goal),
+        macro_c = VALUES(macro_c),
+        macro_p = VALUES(macro_p),
+        macro_f = VALUES(macro_f),
+        bmr = VALUES(bmr),
+        tdee = VALUES(tdee),
+        updated_at = CURRENT_TIMESTAMP`,
+      [
+        userId,
+        profileData.sex,
+        profileData.age,
+        profileData.height_cm,
+        profileData.weight_kg,
+        profileData.activity || 'moderately_active',
+        profileData.goal_type || 'maintain',
+        profileData.rate_kcal_per_day || 0,
+        profileData.calorie_goal,
+        profileData.macro_c || 45,
+        profileData.macro_p || 25,
+        profileData.macro_f || 30,
+        profileData.bmr || 0,
+        profileData.tdee || 0
+      ]
+    );
+    
+    return profileData;
+  } catch (error) {
+    console.error('Save user profile error:', error);
+    throw error;
+  }
+};
+
+export const getUserProfile = async () => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM user_profiles WHERE id = ?',
+      ['default_user']
+    );
+    return rows[0] || null;
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    return null;
+  }
+};
+
+/**
+ * Diary Entry Operations
+ */
+export const saveDiaryEntry = async (entryData) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    const id = entryData.id || `entry_${Date.now()}`;
+    
+    await pool.execute(
+      `INSERT INTO diary_entries (
+        id, user_id, date, meal_type, food_id, food_name, custom_name,
+        amount, unit, source, kcal, carbs, protein, fat
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        'default_user',
+        entryData.date,
+        entryData.meal_type,
+        entryData.food_id,
+        entryData.food_name,
+        entryData.custom_name,
+        entryData.amount,
+        entryData.unit,
+        entryData.source,
+        entryData.kcal,
+        entryData.carbs || 0,
+        entryData.protein || 0,
+        entryData.fat || 0
+      ]
+    );
+    
+    return { ...entryData, id };
+  } catch (error) {
+    console.error('Save diary entry error:', error);
+    throw error;
+  }
+};
+
+export const getDiaryEntries = async (date = null) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    let query = 'SELECT * FROM diary_entries WHERE user_id = ?';
+    let params = ['default_user'];
+    
+    if (date) {
+      query += ' AND date = ?';
+      params.push(date);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const [rows] = await pool.execute(query, params);
+    return rows || [];
+  } catch (error) {
+    console.error('Get diary entries error:', error);
+    return [];
+  }
+};
+
+export const updateDiaryEntry = async (id, updates) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(updates), id];
+    
+    await pool.execute(
+      `UPDATE diary_entries SET ${setClause} WHERE id = ?`,
+      values
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Update diary entry error:', error);
+    throw error;
+  }
+};
+
+export const deleteDiaryEntry = async (id) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    await pool.execute('DELETE FROM diary_entries WHERE id = ?', [id]);
+    return true;
+  } catch (error) {
+    console.error('Delete diary entry error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Exercise Entry Operations
+ */
+export const saveExerciseEntry = async (entryData) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    const id = entryData.id || `exercise_${Date.now()}`;
+    
+    await pool.execute(
+      `INSERT INTO exercise_entries (
+        id, user_id, date, time, category, name, duration_min, calories,
+        distance, sets, reps, weight, notes, met_value
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        'default_user',
+        entryData.date,
+        entryData.time,
+        entryData.category,
+        entryData.name,
+        entryData.durationMin,
+        entryData.calories,
+        entryData.distance,
+        entryData.sets,
+        entryData.reps,
+        entryData.weight,
+        entryData.notes,
+        entryData.met
+      ]
+    );
+    
+    return { ...entryData, id };
+  } catch (error) {
+    console.error('Save exercise entry error:', error);
+    throw error;
+  }
+};
+
+export const getExerciseEntries = async (date = null) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    let query = 'SELECT * FROM exercise_entries WHERE user_id = ?';
+    let params = ['default_user'];
+    
+    if (date) {
+      query += ' AND date = ?';
+      params.push(date);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const [rows] = await pool.execute(query, params);
+    return rows || [];
+  } catch (error) {
+    console.error('Get exercise entries error:', error);
+    return [];
+  }
+};
+
+export const deleteExerciseEntry = async (id) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    await pool.execute('DELETE FROM exercise_entries WHERE id = ?', [id]);
+    return true;
+  } catch (error) {
+    console.error('Delete exercise entry error:', error);
+    throw error;
+  }
+};
+
+/**
+ * My Meals Operations
+ */
+export const saveMyMeal = async (mealData) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    const mealId = mealData.id || `meal_${Date.now()}`;
+    
+    // Insert meal
+    await connection.execute(
+      `INSERT INTO my_meals (
+        id, user_id, name, photo_url, total_kcal, total_carbs, 
+        total_protein, total_fat, directions, source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        mealId,
+        'default_user',
+        mealData.name,
+        mealData.photo,
+        mealData.totalKcal,
+        mealData.totalCarbs || 0,
+        mealData.totalProtein || 0,
+        mealData.totalFat || 0,
+        mealData.directions,
+        mealData.source || 'custom'
+      ]
+    );
+    
+    // Insert meal items
+    if (mealData.items && mealData.items.length > 0) {
+      for (let i = 0; i < mealData.items.length; i++) {
+        const item = mealData.items[i];
+        await connection.execute(
+          `INSERT INTO my_meal_items (
+            id, meal_id, food_id, name, amount, unit, calories,
+            carbs, protein, fat, sort_order
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            `item_${Date.now()}_${i}`,
+            mealId,
+            item.foodId,
+            item.name,
+            item.amount,
+            item.unit,
+            item.calories,
+            item.carbs || 0,
+            item.protein || 0,
+            item.fat || 0,
+            i
+          ]
+        );
+      }
+    }
+    
+    await connection.commit();
+    return { ...mealData, id: mealId };
+  } catch (error) {
+    await connection.rollback();
+    console.error('Save my meal error:', error);
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+export const getMyMeals = async () => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    const [meals] = await pool.execute(
+      `SELECT m.*, 
+       GROUP_CONCAT(
+         CONCAT(mi.name, '|', mi.amount, '|', mi.unit, '|', mi.calories)
+         ORDER BY mi.sort_order SEPARATOR ';'
+       ) as items_data
+       FROM my_meals m
+       LEFT JOIN my_meal_items mi ON m.id = mi.meal_id
+       WHERE m.user_id = ?
+       GROUP BY m.id
+       ORDER BY m.created_at DESC`,
+      ['default_user']
+    );
+    
+    return meals.map(meal => ({
+      ...meal,
+      items: meal.items_data ? meal.items_data.split(';').map(itemStr => {
+        const [name, amount, unit, calories] = itemStr.split('|');
+        return { name, amount: parseFloat(amount), unit, calories: parseInt(calories) };
+      }) : []
+    }));
+  } catch (error) {
+    console.error('Get my meals error:', error);
+    return [];
+  }
+};
+
+export const deleteMyMeal = async (mealId) => {
+  if (!pool) {
+    await initializeDatabase();
+  }
+
+  try {
+    // Items will be deleted automatically due to CASCADE
+    await pool.execute('DELETE FROM my_meals WHERE id = ?', [mealId]);
+    return true;
+  } catch (error) {
+    console.error('Delete my meal error:', error);
     throw error;
   }
 };
@@ -496,10 +964,8 @@ export const calculateNutrition = (food, amount, unit) => {
   } else if (unit === 'lb') {
     totalGrams = amount * 453.592;
   } else if (unit === 'cup') {
-    // Default cup conversion (varies by food type)
     totalGrams = amount * (food.grams_per_serving || 240);
   } else if (unit === 'g') {
-    // Amount is already in grams
     totalGrams = amount;
   }
   
@@ -520,21 +986,21 @@ export const calculateNutrition = (food, amount, unit) => {
  * Get database statistics
  */
 export const getDatabaseStats = async () => {
-  if (!db) {
+  if (!pool) {
     await initializeDatabase();
   }
 
   try {
-    const totalCount = await db.getFirstAsync('SELECT COUNT(*) as count FROM foods');
-    const usdaCount = await db.getFirstAsync('SELECT COUNT(*) as count FROM foods WHERE source = "USDA"');
-    const offCount = await db.getFirstAsync('SELECT COUNT(*) as count FROM foods WHERE source = "OFF"');
-    const customCount = await db.getFirstAsync('SELECT COUNT(*) as count FROM foods WHERE source = "CUSTOM"');
+    const [totalCount] = await pool.execute('SELECT COUNT(*) as count FROM foods');
+    const [usdaCount] = await pool.execute('SELECT COUNT(*) as count FROM foods WHERE source = "USDA"');
+    const [offCount] = await pool.execute('SELECT COUNT(*) as count FROM foods WHERE source = "OFF"');
+    const [customCount] = await pool.execute('SELECT COUNT(*) as count FROM foods WHERE source = "CUSTOM"');
     
     return {
-      total: totalCount.count,
-      usda: usdaCount.count,
-      off: offCount.count,
-      custom: customCount.count,
+      total: totalCount[0].count,
+      usda: usdaCount[0].count,
+      off: offCount[0].count,
+      custom: customCount[0].count,
     };
   } catch (error) {
     console.error('Get database stats error:', error);
@@ -546,8 +1012,8 @@ export const getDatabaseStats = async () => {
  * Close database connection
  */
 export const closeDatabase = async () => {
-  if (db) {
-    await db.closeAsync();
-    db = null;
+  if (pool) {
+    await pool.end();
+    pool = null;
   }
 };
