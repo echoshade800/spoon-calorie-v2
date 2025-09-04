@@ -6,14 +6,9 @@ export class Food {
       let sql, params;
       
       if (!query || query.trim().length === 0) {
-        // 返回热门食物 - 简化查询
-        sql = `
-          SELECT * FROM foods 
-          WHERE source IN (?, ?) 
-          ORDER BY name ASC
-          LIMIT ?
-        `;
-        params = ['USDA', 'OFF', limit];
+        // 返回热门食物 - 使用简单查询避免参数问题
+        sql = `SELECT * FROM foods WHERE source IN ('USDA', 'OFF') ORDER BY name ASC LIMIT ?`;
+        params = [limit];
       } else {
         const searchTerm = `%${query.toLowerCase()}%`;
         sql = `
@@ -42,8 +37,10 @@ export class Food {
       
       console.log('执行 SQL:', sql);
       console.log('参数:', params);
+      console.log('参数类型:', params.map(p => typeof p));
       
       const foods = await executeQuery(sql, params);
+      console.log('查询结果数量:', foods?.length || 0);
       return foods || [];
     } catch (error) {
       console.error('搜索食物失败:', error);
