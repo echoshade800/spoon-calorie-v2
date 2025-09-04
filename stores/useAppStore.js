@@ -73,6 +73,20 @@ export const useAppStore = create((set, get) => ({
         await StorageUtils.setUserData(localUserData);
       }
       
+      // 检查是否为完整的用户数据（已完成 onboarding）
+      const isCompleteProfile = localUserData.sex && localUserData.age && 
+                               localUserData.height_cm && localUserData.weight_kg && 
+                               localUserData.activity_level && localUserData.goal_type && 
+                               localUserData.calorie_goal && localUserData.bmr && 
+                               localUserData.tdee;
+
+      if (!isCompleteProfile) {
+        console.log('用户资料不完整，跳过服务器同步');
+        // 仍然更新本地状态
+        set({ profile: localUserData, isOnboarded: !!localUserData.calorie_goal });
+        return;
+      }
+      
       // 同步到服务器
       const response = await API.syncUser(localUserData);
       
@@ -82,10 +96,18 @@ export const useAppStore = create((set, get) => ({
         await StorageUtils.setUserData(response.user);
         // 更新应用状态
         set({ profile: response.user, isOnboarded: true });
+      } else {
+        console.log('服务器同步跳过:', response.message);
+        // 使用本地数据
+        set({ profile: localUserData, isOnboarded: true });
       }
     } catch (error) {
       console.error('用户数据同步错误:', error);
       // 同步失败不影响应用使用，继续使用本地数据
+      const localUserData = await StorageUtils.getUserData();
+      if (localUserData) {
+        set({ profile: localUserData, isOnboarded: !!localUserData.calorie_goal });
+      }
     }
   },
   
