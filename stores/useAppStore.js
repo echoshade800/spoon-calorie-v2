@@ -73,8 +73,28 @@ export const useAppStore = create((set, get) => ({
         await StorageUtils.setUserData(localUserData);
       }
       
-      // 检查是否为完整的用户数据（已完成 onboarding）
-      const isCompleteProfile = localUserData.sex && localUserData.age && 
+      // 先尝试从服务器获取完整的用户数据
+      try {
+        console.log('尝试从服务器获取用户数据:', localUserData.uid);
+        const serverResponse = await API.getUser(localUserData.uid);
+        
+        if (serverResponse.success && serverResponse.user) {
+          console.log('从服务器获取到完整用户数据');
+          const serverUser = serverResponse.user;
+          
+          // 将服务器数据保存到本地
+          await StorageUtils.setUserData(serverUser);
+          
+          // 更新应用状态
+          set({ profile: serverUser, isOnboarded: true });
+          return;
+        }
+      } catch (serverError) {
+        console.log('服务器查询失败，使用本地数据:', serverError.message);
+      }
+      
+      // 如果服务器没有数据，检查本地数据是否完整
+      const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
                                localUserData.height_cm && localUserData.weight_kg && 
                                localUserData.activity_level && localUserData.goal_type && 
                                localUserData.calorie_goal && localUserData.bmr && 
@@ -90,8 +110,6 @@ export const useAppStore = create((set, get) => ({
   // 用户数据同步
   syncUserData: async () => {
     try {
-      // 重新读取本地存储的数据以获取正确的 UID
-      const localUserData = await StorageUtils.getUserData();
       // 使用当前 store 中的 profile 数据，而不是从存储读取
       const { profile } = get();
       
@@ -100,14 +118,10 @@ export const useAppStore = create((set, get) => ({
         return;
       }
       
-      // 优先使用 localUserData 中的 UID，如果不存在才生成新的
-      let finalUid = localUserData?.uid || profile.uid;
+      // 确保有 UID
+      let finalUid = profile.uid;
       if (!finalUid) {
         finalUid = StorageUtils.generateUID();
-      }
-      
-      // 如果 profile 中没有 UID，更新它
-      if (!profile.uid || profile.uid !== finalUid) {
         const updatedProfile = { ...profile, uid: finalUid };
         set({ profile: updatedProfile });
         await StorageUtils.setUserData(updatedProfile);
