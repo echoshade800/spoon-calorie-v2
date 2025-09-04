@@ -3,45 +3,39 @@ import { executeQuery } from '../config/database.js';
 export class Food {
   static async search(query, limit = 20) {
     try {
-      let sql, params;
+      let sql;
       
       if (!query || query.trim().length === 0) {
-        // 返回热门食物 - 使用简单查询避免参数问题
-        sql = `SELECT * FROM foods WHERE source IN ('USDA', 'OFF') ORDER BY name ASC LIMIT ?`;
-        params = [limit];
+        // 返回热门食物 - 使用直接字符串拼接
+        sql = `SELECT * FROM foods WHERE source IN ('USDA', 'OFF') ORDER BY name ASC LIMIT ${limit}`;
+        console.log('执行 SQL (默认):', sql);
+        
+        const foods = await executeQuery(sql);
+        console.log('查询结果数量:', foods?.length || 0);
+        return foods || [];
       } else {
-        const searchTerm = `%${query.toLowerCase()}%`;
+        // 搜索查询 - 使用直接字符串拼接避免参数问题
+        const searchTerm = query.toLowerCase().replace(/'/g, "''"); // 转义单引号
         sql = `
           SELECT * FROM foods 
-          WHERE (LOWER(name) LIKE ? OR LOWER(brand) LIKE ? OR barcode = ?)
+          WHERE (LOWER(name) LIKE '%${searchTerm}%' OR LOWER(brand) LIKE '%${searchTerm}%' OR barcode = '${searchTerm}')
           ORDER BY 
             CASE 
-              WHEN LOWER(name) = LOWER(?) THEN 1
-              WHEN LOWER(name) LIKE ? THEN 2
-              WHEN LOWER(brand) LIKE ? THEN 3
+              WHEN LOWER(name) = '${searchTerm}' THEN 1
+              WHEN LOWER(name) LIKE '${searchTerm}%' THEN 2
+              WHEN LOWER(brand) LIKE '%${searchTerm}%' THEN 3
               ELSE 4
             END,
             name ASC
-          LIMIT ?
+          LIMIT ${limit}
         `;
-        params = [
-          searchTerm,           // LOWER(name) LIKE ?
-          searchTerm,           // LOWER(brand) LIKE ?
-          query,                // barcode = ?
-          query,                // LOWER(name) = LOWER(?)
-          `${query.toLowerCase()}%`, // LOWER(name) LIKE ?
-          searchTerm,           // LOWER(brand) LIKE ?
-          limit                 // LIMIT ?
-        ];
+        
+        console.log('执行 SQL (搜索):', sql);
+        
+        const foods = await executeQuery(sql);
+        console.log('查询结果数量:', foods?.length || 0);
+        return foods || [];
       }
-      
-      console.log('执行 SQL:', sql);
-      console.log('参数:', params);
-      console.log('参数类型:', params.map(p => typeof p));
-      
-      const foods = await executeQuery(sql, params);
-      console.log('查询结果数量:', foods?.length || 0);
-      return foods || [];
     } catch (error) {
       console.error('搜索食物失败:', error);
       throw error;
@@ -50,8 +44,12 @@ export class Food {
 
   static async findById(id) {
     try {
-      const sql = 'SELECT * FROM foods WHERE id = ?';
-      const foods = await executeQuery(sql, [id]);
+      // 转义 ID 中的单引号
+      const escapedId = id.replace(/'/g, "''");
+      const sql = `SELECT * FROM foods WHERE id = '${escapedId}'`;
+      console.log('执行 SQL (查找):', sql);
+      
+      const foods = await executeQuery(sql);
       return foods.length > 0 ? foods[0] : null;
     } catch (error) {
       console.error('查找食物失败:', error);
@@ -61,34 +59,55 @@ export class Food {
 
   static async create(foodData) {
     try {
+      // 转义所有字符串字段
+      const escapedData = {
+        id: foodData.id.replace(/'/g, "''"),
+        name: foodData.name.replace(/'/g, "''"),
+        brand: foodData.brand ? foodData.brand.replace(/'/g, "''") : null,
+        kcal_per_100g: foodData.kcal_per_100g,
+        carbs_per_100g: foodData.carbs_per_100g || 0,
+        protein_per_100g: foodData.protein_per_100g || 0,
+        fat_per_100g: foodData.fat_per_100g || 0,
+        fiber_per_100g: foodData.fiber_per_100g || 0,
+        sugar_per_100g: foodData.sugar_per_100g || 0,
+        sodium_per_100g: foodData.sodium_per_100g || 0,
+        serving_label: foodData.serving_label ? foodData.serving_label.replace(/'/g, "''") : null,
+        grams_per_serving: foodData.grams_per_serving || null,
+        source: foodData.source.replace(/'/g, "''"),
+        barcode: foodData.barcode ? foodData.barcode.replace(/'/g, "''") : null,
+        category: foodData.category ? foodData.category.replace(/'/g, "''") : null
+      };
+      
       const sql = `
         INSERT INTO foods (
           id, name, brand, kcal_per_100g, carbs_per_100g, protein_per_100g, 
           fat_per_100g, fiber_per_100g, sugar_per_100g, sodium_per_100g,
           serving_label, grams_per_serving, source, barcode, category,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (
+          '${escapedData.id}', 
+          '${escapedData.name}', 
+          ${escapedData.brand ? `'${escapedData.brand}'` : 'NULL'}, 
+          ${escapedData.kcal_per_100g}, 
+          ${escapedData.carbs_per_100g}, 
+          ${escapedData.protein_per_100g}, 
+          ${escapedData.fat_per_100g}, 
+          ${escapedData.fiber_per_100g}, 
+          ${escapedData.sugar_per_100g}, 
+          ${escapedData.sodium_per_100g},
+          ${escapedData.serving_label ? `'${escapedData.serving_label}'` : 'NULL'}, 
+          ${escapedData.grams_per_serving || 'NULL'}, 
+          '${escapedData.source}', 
+          ${escapedData.barcode ? `'${escapedData.barcode}'` : 'NULL'}, 
+          ${escapedData.category ? `'${escapedData.category}'` : 'NULL'},
+          NOW(), 
+          NOW()
+        )
       `;
       
-      const params = [
-        foodData.id,
-        foodData.name,
-        foodData.brand,
-        foodData.kcal_per_100g,
-        foodData.carbs_per_100g || 0,
-        foodData.protein_per_100g || 0,
-        foodData.fat_per_100g || 0,
-        foodData.fiber_per_100g || 0,
-        foodData.sugar_per_100g || 0,
-        foodData.sodium_per_100g || 0,
-        foodData.serving_label,
-        foodData.grams_per_serving,
-        foodData.source,
-        foodData.barcode,
-        foodData.category
-      ];
+      console.log('执行 SQL (创建):', sql);
       
-      await executeQuery(sql, params);
+      await executeQuery(sql);
       return { ...foodData };
     } catch (error) {
       console.error('创建食物失败:', error);

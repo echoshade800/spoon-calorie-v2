@@ -33,8 +33,14 @@ export const testConnection = async () => {
 // 执行查询
 export const executeQuery = async (sql, params = []) => {
   try {
-    const [rows] = await pool.execute(sql, params);
-    return rows;
+    // 如果没有参数，使用 query 方法；如果有参数，使用 execute 方法
+    if (params.length === 0) {
+      const [rows] = await pool.query(sql);
+      return rows;
+    } else {
+      const [rows] = await pool.execute(sql, params);
+      return rows;
+    }
   } catch (error) {
     console.error('SQL 查询执行失败:', error);
     throw error;
