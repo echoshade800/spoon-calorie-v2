@@ -4,6 +4,7 @@ import multer from 'multer';
 import { testConnection, executeQuery } from './config/database.js';
 import { User } from './models/User.js';
 import { Food } from './models/Food.js';
+import { MyMeal } from './models/MyMeal.js';
 import { OpenAIService } from './services/openaiService.js';
 
 const app = express();
