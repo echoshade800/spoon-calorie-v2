@@ -236,10 +236,65 @@ export const useAppStore = create((set, get) => ({
   addMyMeal: (meal) => set((state) => ({
     myMeals: [...state.myMeals, meal]
   })),
+
+  addMyMeal: async (meal) => {
+    try {
+      const { profile } = get();
+      
+      if (!profile?.uid) {
+        throw new Error('用户 UID 不存在');
+      }
+      
+      // 保存到服务器
+      const response = await API.createMeal(profile.uid, meal);
+      
+      if (response.success) {
+        // 更新本地状态
+        set((state) => ({
+          myMeals: [...state.myMeals, response.meal]
+        }));
+        console.log('餐食保存成功');
+      }
+    } catch (error) {
+      console.error('保存餐食失败:', error);
+      // 即使服务器保存失败，也保存到本地状态
+      set((state) => ({
+        myMeals: [...state.myMeals, meal]
+      }));
+      throw error;
+    }
+  },
   
   deleteMyMeal: (mealId) => set((state) => ({
     myMeals: state.myMeals.filter(meal => meal.id !== mealId)
   })),
+
+  deleteMyMeal: async (mealId) => {
+    try {
+      const { profile } = get();
+      
+      if (!profile?.uid) {
+        throw new Error('用户 UID 不存在');
+      }
+      
+      // 从服务器删除
+      await API.deleteMeal(profile.uid, mealId);
+      
+      // 更新本地状态
+      set((state) => ({
+        myMeals: state.myMeals.filter(meal => meal.id !== mealId)
+      }));
+      
+      console.log('餐食删除成功');
+    } catch (error) {
+      console.error('删除餐食失败:', error);
+      // 即使服务器删除失败，也从本地状态删除
+      set((state) => ({
+        myMeals: state.myMeals.filter(meal => meal.id !== mealId)
+      }));
+      throw error;
+    }
+  },
   
   addMyFood: async (food) => {
     try {

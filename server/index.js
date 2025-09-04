@@ -227,6 +227,45 @@ app.post('/api/foods', async (req, res) => {
   }
 });
 
+// 餐食相关接口
+app.get('/api/meals/:uid', async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const meals = await MyMeal.findByUserUid(uid);
+    res.json({ success: true, meals });
+  } catch (error) {
+    console.error('获取用户餐食失败:', error);
+    res.status(500).json({ error: '获取用户餐食失败' });
+  }
+});
+
+app.post('/api/meals', async (req, res) => {
+  try {
+    const { userUid, mealData } = req.body;
+    
+    if (!userUid || !mealData) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+    
+    const meal = await MyMeal.create(userUid, mealData);
+    res.json({ success: true, meal });
+  } catch (error) {
+    console.error('创建餐食失败:', error);
+    res.status(500).json({ error: '创建餐食失败' });
+  }
+});
+
+app.delete('/api/meals/:uid/:mealId', async (req, res) => {
+  try {
+    const { uid, mealId } = req.params;
+    await MyMeal.delete(uid, mealId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除餐食失败:', error);
+    res.status(500).json({ error: '删除餐食失败' });
+  }
+});
+
 // OpenAI 图片识别接口
 app.post('/api/analyze-food-image', upload.single('image'), async (req, res) => {
   try {

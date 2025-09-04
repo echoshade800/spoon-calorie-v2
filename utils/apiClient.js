@@ -73,6 +73,19 @@ export const API = {
     return await apiClient.post('/foods', foodData);
   },
 
+  // 餐食相关
+  async getUserMeals(uid) {
+    return await apiClient.get(`/meals/${uid}`);
+  },
+
+  async createMeal(userUid, mealData) {
+    return await apiClient.post('/meals', { userUid, mealData });
+  },
+
+  async deleteMeal(uid, mealId) {
+    return await apiClient.delete(`/meals/${uid}/${mealId}`);
+  },
+
   // 图片识别
   async analyzeFoodImage(imageUri) {
     try {
