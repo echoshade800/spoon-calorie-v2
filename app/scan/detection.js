@@ -21,7 +21,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMealDisplayName } from '@/utils/helpers';
 import EditPortionModal from '@/components/EditPortionModal';
 import { detectFoodsInImage } from '@/utils/visionAPI';
-import { Alert } from 'react-native';
 
 export default function DetectionScreen() {
   const router = useRouter();
