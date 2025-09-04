@@ -90,6 +90,8 @@ export const useAppStore = create((set, get) => ({
   // 用户数据同步
   syncUserData: async () => {
     try {
+      // 重新读取本地存储的数据以获取正确的 UID
+      const localUserData = await StorageUtils.getUserData();
       // 使用当前 store 中的 profile 数据，而不是从存储读取
       const { profile } = get();
       
@@ -98,9 +100,15 @@ export const useAppStore = create((set, get) => ({
         return;
       }
       
-      // 如果没有 UID，生成一个
-      if (!profile.uid) {
-        const updatedProfile = { ...profile, uid: StorageUtils.generateUID() };
+      // 优先使用 localUserData 中的 UID，如果不存在才生成新的
+      let finalUid = localUserData?.uid || profile.uid;
+      if (!finalUid) {
+        finalUid = StorageUtils.generateUID();
+      }
+      
+      // 如果 profile 中没有 UID，更新它
+      if (!profile.uid || profile.uid !== finalUid) {
+        const updatedProfile = { ...profile, uid: finalUid };
         set({ profile: updatedProfile });
         await StorageUtils.setUserData(updatedProfile);
       }
@@ -115,8 +123,11 @@ export const useAppStore = create((set, get) => ({
         return;
       }
       
+      // 使用包含正确 UID 的 profile 数据进行同步
+      const profileToSync = { ...profile, uid: finalUid };
+      
       // 同步到服务器
-      const response = await API.syncUser(profile);
+      const response = await API.syncUser(profileToSync);
       
       if (response.success) {
         console.log('用户数据同步成功');
