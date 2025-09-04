@@ -20,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMealDisplayName } from '@/utils/helpers';
 import EditPortionModal from '@/components/EditPortionModal';
-import { detectFoodsInImage } from '@/utils/visionAPI';
 
 export default function DetectionScreen() {
   const router = useRouter();
@@ -44,17 +43,63 @@ export default function DetectionScreen() {
     try {
       setIsDetecting(true);
       
-      console.log('Starting food detection with photo:', photoUri);
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Call the real OpenAI Vision API
-      const detectedFoods = await detectFoodsInImage(photoUri);
+      // Mock detection results
+      const mockResults = [
+        {
+          id: 'vision_tmp_1',
+          name: 'Grilled Chicken Breast',
+          confidence: 0.92,
+          calories: 231,
+          servingText: '1 piece (150g)',
+          units: [
+            { label: '1 piece (150g)', grams: 150 },
+            { label: '100 g', grams: 100 },
+            { label: '1 oz', grams: 28.35 },
+          ],
+          macros: { carbs: 0, protein: 43, fat: 5 },
+          selectedUnit: { label: '1 piece (150g)', grams: 150 },
+          servings: 1,
+        },
+        {
+          id: 'vision_tmp_2',
+          name: 'Steamed Broccoli',
+          confidence: 0.78,
+          calories: 34,
+          servingText: '1 cup (91g)',
+          units: [
+            { label: '1 cup (91g)', grams: 91 },
+            { label: '100 g', grams: 100 },
+            { label: '1 spear', grams: 31 },
+          ],
+          macros: { carbs: 7, protein: 3, fat: 0 },
+          selectedUnit: { label: '1 cup (91g)', grams: 91 },
+          servings: 1,
+        },
+        {
+          id: 'vision_tmp_3',
+          name: 'Brown Rice',
+          confidence: 0.65,
+          calories: 216,
+          servingText: '1 cup (195g)',
+          units: [
+            { label: '1 cup (195g)', grams: 195 },
+            { label: '100 g', grams: 100 },
+            { label: '1/2 cup', grams: 97.5 },
+          ],
+          macros: { carbs: 45, protein: 5, fat: 2 },
+          selectedUnit: { label: '1 cup (195g)', grams: 195 },
+          servings: 1,
+        },
+      ];
       
-      console.log('Detection completed, found foods:', detectedFoods);
-      setDetectedItems(detectedFoods);
+      setDetectedItems(mockResults);
       
       // Auto-select high confidence items
       const autoSelected = new Set(
-        detectedFoods
+        mockResults
           .filter(item => item.confidence >= 0.7)
           .map(item => item.id)
       );
@@ -319,6 +364,7 @@ export default function DetectionScreen() {
           }}
         />
       )}
+
     </View>
   );
 }
@@ -564,8 +610,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 8,
     textAlign: 'center',
+    marginBottom: 12,
   },
   emptySubtitle: {
     fontSize: 16,
