@@ -4,7 +4,8 @@
  */
 import { create } from 'zustand';
 import { searchFoods, getFoodById, addCustomFood as addCustomFoodToDB, initializeDatabase } from '@/utils/database';
-import { searchAllDataSources } from '@/utils/foodDataSync';
+import { StorageUtils } from '@/utils/StorageUtils';
+import { API } from '@/utils/apiClient';
 
 export const useAppStore = create((set, get) => ({
   // User Profile & Goals
@@ -42,11 +43,49 @@ export const useAppStore = create((set, get) => ({
   initializeApp: async () => {
     try {
       set({ isLoading: true });
+      
+      // 初始化数据库连接
       await initializeDatabase();
+      
+      // 获取并同步用户数据
+      await get().syncUserData();
+      
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
-      console.error('App initialization error:', error);
-      set({ error: 'Failed to initialize database', isLoading: false });
+      console.error('应用初始化错误:', error);
+      set({ error: '初始化失败', isLoading: false });
+    }
+  },
+  
+  // 用户数据同步
+  syncUserData: async () => {
+    try {
+      const localUserData = await StorageUtils.getUserData();
+      
+      if (!localUserData) {
+        console.log('本地无用户数据');
+        return;
+      }
+      
+      // 如果没有 UID，生成一个
+      if (!localUserData.uid) {
+        localUserData.uid = StorageUtils.generateUID();
+        await StorageUtils.setUserData(localUserData);
+      }
+      
+      // 同步到服务器
+      const response = await API.syncUser(localUserData);
+      
+      if (response.success) {
+        console.log('用户数据同步成功');
+        // 更新本地存储
+        await StorageUtils.setUserData(response.user);
+        // 更新应用状态
+        set({ profile: response.user, isOnboarded: true });
+      }
+    } catch (error) {
+      console.error('用户数据同步错误:', error);
+      // 同步失败不影响应用使用，继续使用本地数据
     }
   },
   
@@ -54,29 +93,12 @@ export const useAppStore = create((set, get) => ({
   searchFoodsInDatabase: async (query) => {
     try {
       set({ isSearching: true });
-      
-      // First try local database
-      let results = await searchFoods(query, 30);
-      
-      // If local results are limited and we have a query, also search external APIs
-      if (query && query.trim().length > 2 && results.length < 10) {
-        const externalResults = await searchAllDataSources(query, 20);
-        
-        // Combine results, prioritizing local database
-        const combinedResults = [
-          ...results,
-          ...externalResults.filter(external => 
-            !results.some(local => local.name.toLowerCase() === external.name.toLowerCase())
-          )
-        ].slice(0, 50);
-        
-        results = combinedResults;
-      }
+      const results = await searchFoods(query, 30);
       
       set({ searchResults: results, isSearching: false });
       return results;
     } catch (error) {
-      console.error('Search foods error:', error);
+      console.error('搜索食物错误:', error);
       set({ searchResults: [], isSearching: false });
       return [];
     }
