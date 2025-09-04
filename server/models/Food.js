@@ -6,19 +6,14 @@ export class Food {
       let sql, params;
       
       if (!query || query.trim().length === 0) {
-        // 返回热门食物
+        // 返回热门食物 - 简化查询
         sql = `
           SELECT * FROM foods 
           WHERE source IN (?, ?) 
-          ORDER BY 
-            CASE 
-              WHEN name IN (?, ?, ?, ?) THEN 1
-              ELSE 2
-            END,
-            name ASC
+          ORDER BY name ASC
           LIMIT ?
         `;
-        params = ['USDA', 'OFF', 'Bananas, raw', 'Chicken, broilers or fryers, breast, meat only, cooked, roasted', 'Milk, reduced fat, fluid, 2% milkfat', 'Nuts, almonds', limit];
+        params = ['USDA', 'OFF', limit];
       } else {
         const searchTerm = `%${query.toLowerCase()}%`;
         sql = `
@@ -34,8 +29,19 @@ export class Food {
             name ASC
           LIMIT ?
         `;
-        params = [searchTerm, searchTerm, query, query, `${query.toLowerCase()}%`, searchTerm, limit];
+        params = [
+          searchTerm,           // LOWER(name) LIKE ?
+          searchTerm,           // LOWER(brand) LIKE ?
+          query,                // barcode = ?
+          query,                // LOWER(name) = LOWER(?)
+          `${query.toLowerCase()}%`, // LOWER(name) LIKE ?
+          searchTerm,           // LOWER(brand) LIKE ?
+          limit                 // LIMIT ?
+        ];
       }
+      
+      console.log('执行 SQL:', sql);
+      console.log('参数:', params);
       
       const foods = await executeQuery(sql, params);
       return foods || [];
