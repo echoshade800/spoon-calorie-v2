@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/useAppStore';
 import { calculateBMR, calculateTDEE, calculateDailyGoal } from '@/data/mockData';
 import { validateProfileData } from '@/utils/helpers';
+import { StorageUtils } from '@/utils/StorageUtils';
 
 const STEPS = [
   { title: 'Your Goal', key: 'goal' },
@@ -82,6 +83,7 @@ export default function OnboardingScreen() {
       // Create complete profile
       const completeProfile = {
         ...formData,
+        uid: StorageUtils.generateUID(), // 生成唯一 UID
         age: parseInt(formData.age),
         height_cm: parseFloat(formData.height_cm),
         weight_kg: parseFloat(formData.weight_kg),
@@ -91,10 +93,23 @@ export default function OnboardingScreen() {
         macro_f: 30,
         bmr: Math.round(bmr),
         tdee: Math.round(tdee),
+        activity_level: formData.activity, // 确保包含 activity_level
       };
 
-      // Save profile and mark onboarding complete
+      // Save profile locally and mark onboarding complete
       setProfile(completeProfile);
+      
+      // 异步同步到服务器（不阻塞用户进入应用）
+      setTimeout(async () => {
+        try {
+          const { syncUserData } = useAppStore.getState();
+          await syncUserData();
+          console.log('用户数据已同步到服务器');
+        } catch (error) {
+          console.error('后台同步用户数据失败:', error);
+          // 不显示错误给用户，静默失败
+        }
+      }, 1000);
       
       // Navigate to main app
       router.replace('/(tabs)');

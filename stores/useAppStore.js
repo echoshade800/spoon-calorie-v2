@@ -47,13 +47,43 @@ export const useAppStore = create((set, get) => ({
       // 初始化数据库连接
       await initializeDatabase();
       
-      // 获取并同步用户数据
-      await get().syncUserData();
+      // 只加载本地用户数据，不同步到服务器
+      await get().loadLocalUserData();
       
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
       console.error('应用初始化错误:', error);
       set({ error: '初始化失败', isLoading: false });
+    }
+  },
+  
+  // 加载本地用户数据（不同步服务器）
+  loadLocalUserData: async () => {
+    try {
+      const localUserData = await StorageUtils.getUserData();
+      
+      if (!localUserData) {
+        console.log('本地无用户数据');
+        return;
+      }
+      
+      // 如果没有 UID，生成一个
+      if (!localUserData.uid) {
+        localUserData.uid = StorageUtils.generateUID();
+        await StorageUtils.setUserData(localUserData);
+      }
+      
+      // 检查是否为完整的用户数据（已完成 onboarding）
+      const isCompleteProfile = localUserData.sex && localUserData.age && 
+                               localUserData.height_cm && localUserData.weight_kg && 
+                               localUserData.activity_level && localUserData.goal_type && 
+                               localUserData.calorie_goal && localUserData.bmr && 
+                               localUserData.tdee;
+
+      // 更新本地状态
+      set({ profile: localUserData, isOnboarded: isCompleteProfile });
+    } catch (error) {
+      console.error('加载本地用户数据错误:', error);
     }
   },
   
