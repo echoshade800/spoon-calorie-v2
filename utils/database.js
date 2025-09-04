@@ -69,11 +69,26 @@ export const addCustomFood = async (foodData) => {
     
     // Validate required fields
     if (!foodData.name || !foodData.kcal_per_100g) {
+      throw new Error('Name and calories are required');
     }
+    
+    const response = await API.createFood({
+      id,
+      ...foodData,
+      source: 'CUSTOM',
+      category: foodData.category || 'Custom',
+    });
+    
+    return response.food;
+  } catch (error) {
+    console.error('添加自定义食物错误:', error);
+    throw error;
   }
+};
+
+/**
  * Calculate nutrition for specific amount
  */
-}
 export const calculateNutrition = (food, amount, unit) => {
   let totalGrams = amount;
   
