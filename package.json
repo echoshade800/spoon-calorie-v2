@@ -2,6 +2,7 @@
   "name": "quickkcal",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
