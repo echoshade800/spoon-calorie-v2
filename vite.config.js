@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite';
-import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill';
 
 export default defineConfig({
   server: {
@@ -8,17 +7,10 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
+    'process.env': 'process.env',
   },
   optimizeDeps: {
     include: ['process'],
-  },
-  esbuild: {
-    plugins: [
-      NodeGlobalsPolyfillPlugin({
-        process: true,
-        buffer: true,
-      }),
-    ],
   },
   build: {
     outDir: 'dist',

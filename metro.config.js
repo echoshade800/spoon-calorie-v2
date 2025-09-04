@@ -1,4 +1,9 @@
-const { getDefaultConfig } = require('expo/metro-config');
+import { getDefaultConfig } from 'expo/metro-config';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const config = getDefaultConfig(__dirname);
 
@@ -9,7 +14,7 @@ config.resolver.sourceExts.push('wasm');
 // Add process polyfill for web
 config.resolver.alias = {
   ...config.resolver.alias,
-  process: require.resolve('process/browser'),
+  process: 'process/browser',
 };
 
 // Configure globals for web
@@ -23,4 +28,4 @@ config.transformer = {
   }),
 };
 
-module.exports = config;
+export default config;
