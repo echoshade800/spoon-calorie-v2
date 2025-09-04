@@ -50,6 +50,9 @@ export const useAppStore = create((set, get) => ({
       // 只加载本地用户数据，不同步到服务器
       await get().loadLocalUserData();
       
+      // 加载用户的餐食数据
+      await get().loadUserMeals();
+      
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
       console.error('应用初始化错误:', error);
@@ -164,6 +167,38 @@ export const useAppStore = create((set, get) => ({
     }
   },
   
+  // 加载用户餐食数据
+  loadUserMeals: async () => {
+    try {
+      // 先尝试从本地存储获取 UID
+      const localUserData = await StorageUtils.getUserData();
+      const { profile } = get();
+      
+      // 优先使用本地存储的 UID，其次使用 profile 的 UID
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid) {
+        console.log('用户 UID 不存在，跳过加载餐食数据');
+        return;
+      }
+      
+      console.log('开始加载用户餐食数据:', userUid);
+      const response = await API.getUserMeals(userUid);
+      
+      if (response.success && response.meals) {
+        console.log(`成功加载 ${response.meals.length} 个餐食`);
+        set({ myMeals: response.meals });
+      } else {
+        console.log('服务器返回空餐食数据');
+        set({ myMeals: [] });
+      }
+    } catch (error) {
+      console.error('加载用户餐食数据失败:', error);
+      // 加载失败不影响应用使用，保持空数组
+      set({ myMeals: [] });
+    }
+  },
+  
   // Food search
   searchFoodsInDatabase: async (query) => {
     try {
@@ -259,6 +294,9 @@ export const useAppStore = create((set, get) => ({
           myMeals: [...state.myMeals, response.meal]
         }));
         console.log('餐食保存成功');
+        
+        // 重新加载餐食数据以确保同步
+        await get().loadUserMeals();
       }
     } catch (error) {
       console.error('保存餐食失败:', error);
@@ -296,6 +334,9 @@ export const useAppStore = create((set, get) => ({
       }));
       
       console.log('餐食删除成功');
+      
+      // 重新加载餐食数据以确保同步
+      await get().loadUserMeals();
     } catch (error) {
       console.error('删除餐食失败:', error);
       // 即使服务器删除失败，也从本地状态删除
