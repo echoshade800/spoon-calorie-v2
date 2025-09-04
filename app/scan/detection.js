@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMealDisplayName } from '@/utils/helpers';
 import EditPortionModal from '@/components/EditPortionModal';
+import { detectFoodsInImage } from '@/utils/visionAPI';
+import { Alert } from 'react-native';
 
 export default function DetectionScreen() {
   const router = useRouter();
@@ -43,63 +45,23 @@ export default function DetectionScreen() {
     try {
       setIsDetecting(true);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call real OpenAI food detection API
+      console.log('开始调用 OpenAI 图片识别...');
+      const detectedFoods = await detectFoodsInImage(photoUri);
       
-      // Mock detection results
-      const mockResults = [
-        {
-          id: 'vision_tmp_1',
-          name: 'Grilled Chicken Breast',
-          confidence: 0.92,
-          calories: 231,
-          servingText: '1 piece (150g)',
-          units: [
-            { label: '1 piece (150g)', grams: 150 },
-            { label: '100 g', grams: 100 },
-            { label: '1 oz', grams: 28.35 },
-          ],
-          macros: { carbs: 0, protein: 43, fat: 5 },
-          selectedUnit: { label: '1 piece (150g)', grams: 150 },
-          servings: 1,
-        },
-        {
-          id: 'vision_tmp_2',
-          name: 'Steamed Broccoli',
-          confidence: 0.78,
-          calories: 34,
-          servingText: '1 cup (91g)',
-          units: [
-            { label: '1 cup (91g)', grams: 91 },
-            { label: '100 g', grams: 100 },
-            { label: '1 spear', grams: 31 },
-          ],
-          macros: { carbs: 7, protein: 3, fat: 0 },
-          selectedUnit: { label: '1 cup (91g)', grams: 91 },
-          servings: 1,
-        },
-        {
-          id: 'vision_tmp_3',
-          name: 'Brown Rice',
-          confidence: 0.65,
-          calories: 216,
-          servingText: '1 cup (195g)',
-          units: [
-            { label: '1 cup (195g)', grams: 195 },
-            { label: '100 g', grams: 100 },
-            { label: '1/2 cup', grams: 97.5 },
-          ],
-          macros: { carbs: 45, protein: 5, fat: 2 },
-          selectedUnit: { label: '1 cup (195g)', grams: 195 },
-          servings: 1,
-        },
-      ];
+      if (!detectedFoods || detectedFoods.length === 0) {
+        console.log('OpenAI 未识别到食物');
+        setDetectionFailed(true);
+        setIsDetecting(false);
+        return;
+      }
       
-      setDetectedItems(mockResults);
+      console.log(`OpenAI 识别到 ${detectedFoods.length} 种食物:`, detectedFoods);
+      setDetectedItems(detectedFoods);
       
-      // Auto-select high confidence items
+      // Auto-select high confidence items (>= 0.7)
       const autoSelected = new Set(
-        mockResults
+        detectedFoods
           .filter(item => item.confidence >= 0.7)
           .map(item => item.id)
       );
@@ -110,6 +72,17 @@ export default function DetectionScreen() {
       console.error('Detection error:', error);
       setDetectionFailed(true);
       setIsDetecting(false);
+      
+      // Show user-friendly error message
+      Alert.alert(
+        '识别失败',
+        '图片识别服务暂时不可用，请稍后重试或手动添加食物。',
+        [
+          { text: '手动添加', onPress: handleManualSearch },
+          { text: '重试', onPress: performFoodDetection },
+          { text: '取消', style: 'cancel' }
+        ]
+      );
     }
   };
 

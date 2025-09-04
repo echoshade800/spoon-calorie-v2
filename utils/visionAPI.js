@@ -12,7 +12,7 @@ export const detectFoodsInImage = async (imageUri) => {
     console.log('开始 OpenAI 图片分析...');
     const response = await API.analyzeFoodImage(imageUri);
     
-    if (!response.foods || response.foods.length === 0) {
+    if (!response || !response.foods || response.foods.length === 0) {
       console.log('OpenAI 未识别到食物');
       return [];
     }
@@ -22,11 +22,14 @@ export const detectFoodsInImage = async (imageUri) => {
       id: `openai_${Date.now()}_${index}`,
       name: food.name,
       confidence: food.confidence || 0.8,
-      calories: food.calories || 0,
+      calories: food.calories || food.kcal_per_100g || 0,
       servingText: food.servingText || '100g',
       units: food.units || [
         { label: '100 g', grams: 100 },
-        { label: '1 g', grams: 1 }
+        { label: '1 g', grams: 1 },
+        ...(food.serving_label && food.grams_per_serving ? [
+          { label: food.serving_label, grams: food.grams_per_serving }
+        ] : [])
       ],
       macros: food.macros || { carbs: 0, protein: 0, fat: 0 },
       selectedUnit: food.units?.[0] || { label: '100 g', grams: 100 },
@@ -39,7 +42,15 @@ export const detectFoodsInImage = async (imageUri) => {
     
   } catch (error) {
     console.error('OpenAI 食物识别错误:', error);
-    throw new Error('图片识别失败，请重试');
+    
+    // 根据错误类型提供更具体的错误信息
+    if (error.message.includes('无法连接到服务器')) {
+      throw new Error('网络连接失败，请检查网络后重试');
+    } else if (error.message.includes('图片分析失败')) {
+      throw new Error('图片分析失败，请尝试重新拍照');
+    } else {
+      throw new Error('识别服务暂时不可用，请稍后重试');
+    }
   }
 };
 

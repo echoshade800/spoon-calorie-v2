@@ -25,7 +25,7 @@ export class OpenAIService {
                     {
                       "name": "食物名称",
                       "confidence": 0.95,
-                      "calories": 估算卡路里,
+                      "kcal_per_100g": 每100克卡路里,
                       "servingText": "份量描述",
                       "units": [
                         {"label": "1份", "grams": 100},
@@ -35,15 +35,18 @@ export class OpenAIService {
                         "carbs": 碳水化合物克数,
                         "protein": 蛋白质克数,
                         "fat": 脂肪克数
-                      }
+                      },
+                      "serving_label": "默认份量标签",
+                      "grams_per_serving": 默认份量克数
                     }
                   ]
                   
                   请确保：
                   1. 只识别明确可见的食物
-                  2. 提供合理的营养估算
+                  2. 提供合理的营养估算（每100克为基准）
                   3. 置信度反映识别的确定性
-                  4. 返回纯JSON格式，不要其他文字`
+                  4. 返回纯JSON格式，不要其他文字
+                  5. 如果无法识别任何食物，返回空数组 []`
                 },
                 {
                   type: 'image_url',
