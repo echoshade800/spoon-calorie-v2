@@ -239,14 +239,19 @@ export const useAppStore = create((set, get) => ({
 
   addMyMeal: async (meal) => {
     try {
+      // 先尝试从本地存储获取 UID
+      const localUserData = await StorageUtils.getUserData();
       const { profile } = get();
       
-      if (!profile?.uid) {
-        throw new Error('用户 UID 不存在');
+      // 优先使用本地存储的 UID，其次使用 profile 的 UID
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid) {
+        throw new Error('用户 UID 不存在，请重新登录');
       }
       
       // 保存到服务器
-      const response = await API.createMeal(profile.uid, meal);
+      const response = await API.createMeal(userUid, meal);
       
       if (response.success) {
         // 更新本地状态
@@ -271,14 +276,19 @@ export const useAppStore = create((set, get) => ({
 
   deleteMyMeal: async (mealId) => {
     try {
+      // 先尝试从本地存储获取 UID
+      const localUserData = await StorageUtils.getUserData();
       const { profile } = get();
       
-      if (!profile?.uid) {
-        throw new Error('用户 UID 不存在');
+      // 优先使用本地存储的 UID，其次使用 profile 的 UID
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid) {
+        throw new Error('用户 UID 不存在，请重新登录');
       }
       
       // 从服务器删除
-      await API.deleteMeal(profile.uid, mealId);
+      await API.deleteMeal(userUid, mealId);
       
       // 更新本地状态
       set((state) => ({
