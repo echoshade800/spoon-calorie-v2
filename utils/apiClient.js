@@ -86,6 +86,19 @@ export const API = {
     return await apiClient.delete(`/meals/${uid}/${mealId}`);
   },
 
+  // 日记条目相关
+  async getUserDiaryEntries(uid, date) {
+    return await apiClient.get(`/diary/${uid}/${date}`);
+  },
+
+  async createDiaryEntry(entryData) {
+    return await apiClient.post('/diary', entryData);
+  },
+
+  async deleteDiaryEntry(uid, entryId) {
+    return await apiClient.delete(`/diary/${uid}/${entryId}`);
+  },
+
   // 图片识别
   async analyzeFoodImage(imageUri) {
     try {

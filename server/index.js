@@ -5,6 +5,7 @@ import { testConnection, executeQuery } from './config/database.js';
 import { User } from './models/User.js';
 import { Food } from './models/Food.js';
 import { MyMeal } from './models/MyMeal.js';
+import { DiaryEntry } from './models/DiaryEntry.js';
 import { OpenAIService } from './services/openaiService.js';
 
 const app = express();
@@ -307,6 +308,45 @@ app.delete('/api/meals/:uid/:mealId', async (req, res) => {
   } catch (error) {
     console.error('删除餐食失败:', error);
     res.status(500).json({ error: '删除餐食失败' });
+  }
+});
+
+// 日记条目相关接口
+app.get('/api/diary/:uid/:date', async (req, res) => {
+  try {
+    const { uid, date } = req.params;
+    const entries = await DiaryEntry.findByUserAndDate(uid, date);
+    res.json({ success: true, entries });
+  } catch (error) {
+    console.error('获取日记条目失败:', error);
+    res.status(500).json({ error: '获取日记条目失败' });
+  }
+});
+
+app.post('/api/diary', async (req, res) => {
+  try {
+    const entryData = req.body;
+    
+    if (!entryData.user_uid || !entryData.date) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+    
+    const entry = await DiaryEntry.create(entryData);
+    res.json({ success: true, entry });
+  } catch (error) {
+    console.error('创建日记条目失败:', error);
+    res.status(500).json({ error: '创建日记条目失败' });
+  }
+});
+
+app.delete('/api/diary/:uid/:entryId', async (req, res) => {
+  try {
+    const { uid, entryId } = req.params;
+    await DiaryEntry.delete(uid, entryId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除日记条目失败:', error);
+    res.status(500).json({ error: '删除日记条目失败' });
   }
 });
 

@@ -59,6 +59,8 @@ export default function DiaryScreen() {
   React.useEffect(() => {
     // 确保加载用户餐食数据
     loadUserMeals();
+    // 加载今天的日记条目
+    loadTodaysDiaryEntries();
     
     // Check if we should scroll to exercise section
     const timer = setTimeout(() => {
