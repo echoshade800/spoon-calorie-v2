@@ -49,12 +49,17 @@ export default function DiaryScreen() {
     profile,
     deleteDiaryEntry,
     deleteExerciseEntry,
+    myMeals,
+    loadUserMeals
   } = useAppStore();
 
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Handle navigation from home exercise card
   React.useEffect(() => {
+    // 确保加载用户餐食数据
+    loadUserMeals();
+    
     // Check if we should scroll to exercise section
     const timer = setTimeout(() => {
       if (sectionListRef.current) {
@@ -303,6 +308,18 @@ export default function DiaryScreen() {
           >
             <Text style={styles.addFoodText}>ADD FOOD</Text>
           </TouchableOpacity>
+          
+          {/* My Meals Quick Access */}
+          {myMeals.length > 0 && (
+            <TouchableOpacity 
+              style={styles.myMealsHint}
+              onPress={() => router.push(`/(tabs)/add?meal=${section.key}&tab=meals`)}
+            >
+              <Text style={styles.myMealsText}>
+                Or choose from {myMeals.length} saved meal{myMeals.length !== 1 ? 's' : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
           
           {section.data.length === 0 && (
             <TouchableOpacity 
@@ -619,6 +636,14 @@ const styles = StyleSheet.create({
   mealScanText: {
     fontSize: 15,
     color: '#8E8E93',
+  },
+  myMealsHint: {
+    paddingTop: 8,
+  },
+  myMealsText: {
+    fontSize: 15,
+    color: '#4CAF50',
+    fontWeight: '500',
   },
   stepsEntry: {
     flexDirection: 'row',

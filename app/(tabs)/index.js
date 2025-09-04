@@ -27,7 +27,9 @@ export default function HomeScreen() {
     isOnboarded, 
     selectedDate,
     getTodaysStats,
-    getTodaysExercises
+    getTodaysExercises,
+    myMeals,
+    loadUserMeals
   } = useAppStore();
 
   const [showGoalsModal, setShowGoalsModal] = useState(false);
@@ -36,6 +38,9 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!isOnboarded) {
       router.replace('/onboarding');
+    } else {
+      // 确保加载用户餐食数据
+      loadUserMeals();
     }
   }, [isOnboarded]);
 
@@ -144,6 +149,27 @@ export default function HomeScreen() {
 
       {/* Bottom Stats */}
       <View style={styles.bottomStats}>
+        <TouchableOpacity 
+          style={styles.statCard}
+          onPress={() => router.push('/(tabs)/add?tab=meals')}
+        >
+          <View style={styles.statHeader}>
+            <Text style={styles.statTitle}>My Meals</Text>
+            <TouchableOpacity onPress={() => router.push('/create-meal')}>
+              <Ionicons name="add" size={20} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.statContent}>
+            <View style={styles.statIcon}>
+              <Ionicons name="restaurant" size={20} color="#4CAF50" />
+            </View>
+            <View>
+              <Text style={styles.statNumber}>{myMeals.length}</Text>
+              <Text style={styles.statGoal}>Saved meals</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity 
           style={styles.statCard}
           onPress={() => {
