@@ -107,10 +107,6 @@ export const useAppStore = create((set, get) => ({
       
       // 检查是否为完整的用户数据（已完成 onboarding）
       const isCompleteProfile = profile.calorie_goal && profile.bmr && profile.tdee;
-                               localUserData.height_cm && localUserData.weight_kg && 
-                               localUserData.activity_level && localUserData.goal_type && 
-                               localUserData.calorie_goal && localUserData.bmr && 
-                               localUserData.tdee;
 
       if (!isCompleteProfile) {
         console.log('用户资料不完整，跳过服务器同步');
