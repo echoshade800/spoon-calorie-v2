@@ -90,21 +90,23 @@ export const useAppStore = create((set, get) => ({
   // 用户数据同步
   syncUserData: async () => {
     try {
-      const localUserData = await StorageUtils.getUserData();
+      // 使用当前 store 中的 profile 数据，而不是从存储读取
+      const { profile } = get();
       
-      if (!localUserData) {
+      if (!profile) {
         console.log('本地无用户数据');
         return;
       }
       
       // 如果没有 UID，生成一个
-      if (!localUserData.uid) {
-        localUserData.uid = StorageUtils.generateUID();
-        await StorageUtils.setUserData(localUserData);
+      if (!profile.uid) {
+        const updatedProfile = { ...profile, uid: StorageUtils.generateUID() };
+        set({ profile: updatedProfile });
+        await StorageUtils.setUserData(updatedProfile);
       }
       
       // 检查是否为完整的用户数据（已完成 onboarding）
-      const isCompleteProfile = localUserData.sex && localUserData.age && 
+      const isCompleteProfile = profile.calorie_goal && profile.bmr && profile.tdee;
                                localUserData.height_cm && localUserData.weight_kg && 
                                localUserData.activity_level && localUserData.goal_type && 
                                localUserData.calorie_goal && localUserData.bmr && 
@@ -113,12 +115,12 @@ export const useAppStore = create((set, get) => ({
       if (!isCompleteProfile) {
         console.log('用户资料不完整，跳过服务器同步');
         // 仍然更新本地状态
-        set({ profile: localUserData, isOnboarded: !!localUserData.calorie_goal });
+        set({ isOnboarded: !!profile.calorie_goal });
         return;
       }
       
       // 同步到服务器
-      const response = await API.syncUser(localUserData);
+      const response = await API.syncUser(profile);
       
       if (response.success) {
         console.log('用户数据同步成功');
@@ -129,14 +131,14 @@ export const useAppStore = create((set, get) => ({
       } else {
         console.log('服务器同步跳过:', response.message);
         // 使用本地数据
-        set({ profile: localUserData, isOnboarded: true });
+        set({ isOnboarded: true });
       }
     } catch (error) {
       console.error('用户数据同步错误:', error);
       // 同步失败不影响应用使用，继续使用本地数据
-      const localUserData = await StorageUtils.getUserData();
-      if (localUserData) {
-        set({ profile: localUserData, isOnboarded: !!localUserData.calorie_goal });
+      const { profile } = get();
+      if (profile) {
+        set({ isOnboarded: !!profile.calorie_goal });
       }
     }
   },
