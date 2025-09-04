@@ -132,6 +132,49 @@ const initializeTables = async () => {
       )
     `);
     
+    // 创建我的餐食表
+    await executeQuery(`
+      CREATE TABLE IF NOT EXISTS my_meals (
+        id VARCHAR(255) PRIMARY KEY,
+        user_uid VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        photo TEXT,
+        total_kcal DECIMAL(8,2) DEFAULT 0,
+        total_carbs DECIMAL(8,2) DEFAULT 0,
+        total_protein DECIMAL(8,2) DEFAULT 0,
+        total_fat DECIMAL(8,2) DEFAULT 0,
+        directions TEXT,
+        source VARCHAR(50) DEFAULT 'custom',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_uid) REFERENCES users(uid) ON DELETE CASCADE,
+        INDEX idx_user_uid (user_uid),
+        INDEX idx_name (name)
+      )
+    `);
+    
+    // 创建我的餐食项目表
+    await executeQuery(`
+      CREATE TABLE IF NOT EXISTS my_meal_items (
+        id VARCHAR(255) PRIMARY KEY,
+        meal_id VARCHAR(255) NOT NULL,
+        food_id VARCHAR(255),
+        name VARCHAR(255) NOT NULL,
+        amount DECIMAL(8,2) NOT NULL,
+        unit VARCHAR(50) NOT NULL,
+        calories DECIMAL(8,2) NOT NULL,
+        carbs DECIMAL(8,2) DEFAULT 0,
+        protein DECIMAL(8,2) DEFAULT 0,
+        fat DECIMAL(8,2) DEFAULT 0,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (meal_id) REFERENCES my_meals(id) ON DELETE CASCADE,
+        INDEX idx_meal_id (meal_id),
+        INDEX idx_food_id (food_id),
+        INDEX idx_sort_order (sort_order)
+      )
+    `);
+    
     // 插入示例食物数据
     await executeQuery(`
       INSERT IGNORE INTO foods (id, name, brand, kcal_per_100g, carbs_per_100g, protein_per_100g, fat_per_100g, serving_label, grams_per_serving, source, category) VALUES
