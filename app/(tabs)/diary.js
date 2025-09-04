@@ -50,7 +50,8 @@ export default function DiaryScreen() {
     deleteDiaryEntry,
     deleteExerciseEntry,
     myMeals,
-    loadUserMeals
+    loadUserMeals,
+    loadTodaysDiaryEntries
   } = useAppStore();
 
   const [showDatePicker, setShowDatePicker] = useState(false);
