@@ -9,16 +9,16 @@ export class Food {
         // 返回热门食物
         sql = `
           SELECT * FROM foods 
-          WHERE source IN ('USDA', 'OFF') 
+          WHERE source IN (?, ?) 
           ORDER BY 
             CASE 
-              WHEN name IN ('Bananas, raw', 'Chicken, broilers or fryers, breast, meat only, cooked, roasted', 'Milk, reduced fat, fluid, 2% milkfat', 'Nuts, almonds') THEN 1
+              WHEN name IN (?, ?, ?, ?) THEN 1
               ELSE 2
             END,
             name ASC
           LIMIT ?
         `;
-        params = [limit];
+        params = ['USDA', 'OFF', 'Bananas, raw', 'Chicken, broilers or fryers, breast, meat only, cooked, roasted', 'Milk, reduced fat, fluid, 2% milkfat', 'Nuts, almonds', limit];
       } else {
         const searchTerm = `%${query.toLowerCase()}%`;
         sql = `

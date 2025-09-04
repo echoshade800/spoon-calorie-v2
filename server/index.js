@@ -81,6 +81,56 @@ const initializeTables = async () => {
       )
     `);
     
+    // 创建日记条目表
+    await executeQuery(`
+      CREATE TABLE IF NOT EXISTS diary_entries (
+        id VARCHAR(255) PRIMARY KEY,
+        user_uid VARCHAR(255) NOT NULL,
+        date DATE NOT NULL,
+        meal_type ENUM('breakfast', 'lunch', 'dinner', 'snack') NOT NULL,
+        food_id VARCHAR(255),
+        food_name VARCHAR(255) NOT NULL,
+        custom_name VARCHAR(255),
+        amount DECIMAL(8,2) NOT NULL,
+        unit VARCHAR(50) NOT NULL,
+        source VARCHAR(50) NOT NULL,
+        kcal DECIMAL(8,2) NOT NULL,
+        carbs DECIMAL(8,2) DEFAULT 0,
+        protein DECIMAL(8,2) DEFAULT 0,
+        fat DECIMAL(8,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_uid) REFERENCES users(uid) ON DELETE CASCADE,
+        INDEX idx_user_date (user_uid, date),
+        INDEX idx_meal_type (meal_type)
+      )
+    `);
+    
+    // 创建运动条目表
+    await executeQuery(`
+      CREATE TABLE IF NOT EXISTS exercise_entries (
+        id VARCHAR(255) PRIMARY KEY,
+        user_uid VARCHAR(255) NOT NULL,
+        date DATE NOT NULL,
+        time TIME,
+        category ENUM('cardio', 'strength') NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        duration_min INT NOT NULL,
+        calories DECIMAL(8,2) NOT NULL,
+        distance DECIMAL(8,2),
+        sets INT,
+        reps INT,
+        weight DECIMAL(8,2),
+        notes TEXT,
+        met_value DECIMAL(4,2),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_uid) REFERENCES users(uid) ON DELETE CASCADE,
+        INDEX idx_user_date (user_uid, date),
+        INDEX idx_category (category)
+      )
+    `);
+    
     // 插入示例食物数据
     await executeQuery(`
       INSERT IGNORE INTO foods (id, name, brand, kcal_per_100g, carbs_per_100g, protein_per_100g, fat_per_100g, serving_label, grams_per_serving, source, category) VALUES
