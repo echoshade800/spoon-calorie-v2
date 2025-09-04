@@ -74,7 +74,11 @@ export const useAppStore = create((set, get) => ({
       }
       
       // 检查是否为完整的用户数据（已完成 onboarding）
-      const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
+      const isCompleteProfile = localUserData.sex && localUserData.age && 
+                               localUserData.height_cm && localUserData.weight_kg && 
+                               localUserData.activity_level && localUserData.goal_type && 
+                               localUserData.calorie_goal && localUserData.bmr && 
+                               localUserData.tdee;
 
       // 更新本地状态
       set({ profile: localUserData, isOnboarded: isCompleteProfile });
@@ -100,12 +104,16 @@ export const useAppStore = create((set, get) => ({
       }
       
       // 检查是否为完整的用户数据（已完成 onboarding）
-      const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
+      const isCompleteProfile = localUserData.sex && localUserData.age && 
+                               localUserData.height_cm && localUserData.weight_kg && 
+                               localUserData.activity_level && localUserData.goal_type && 
+                               localUserData.calorie_goal && localUserData.bmr && 
+                               localUserData.tdee;
 
       if (!isCompleteProfile) {
         console.log('用户资料不完整，跳过服务器同步');
         // 仍然更新本地状态
-        set({ profile: localUserData, isOnboarded: false });
+        set({ profile: localUserData, isOnboarded: !!localUserData.calorie_goal });
         return;
       }
       
@@ -128,8 +136,7 @@ export const useAppStore = create((set, get) => ({
       // 同步失败不影响应用使用，继续使用本地数据
       const localUserData = await StorageUtils.getUserData();
       if (localUserData) {
-        const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
-        set({ profile: localUserData, isOnboarded: isCompleteProfile });
+        set({ profile: localUserData, isOnboarded: !!localUserData.calorie_goal });
       }
     }
   },
