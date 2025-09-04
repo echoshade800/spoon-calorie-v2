@@ -21,18 +21,6 @@ export const initializeDatabase = async () => {
 };
 
 /**
-    console.log('初始化数据库连接...');
-    // 测试 API 连接
-    await API.searchFoods('', 1);
-    console.log('数据库连接成功');
-    return true;
-  } catch (error) {
-    console.error('数据库初始化错误:', error);
-    throw error;
-  }
-};
-
-/**
  * Search foods in the database
  */
 export const searchFoods = async (query, limit = 20) => {
