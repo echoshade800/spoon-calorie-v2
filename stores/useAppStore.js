@@ -220,6 +220,21 @@ export const useAppStore = create((set, get) => ({
       
       if (response.success && response.entries) {
         console.log(`成功加载 ${response.entries.length} 个日记条目`);
+        // 转换数据格式以匹配前端期望的格式
+        const formattedEntries = response.entries.map(entry => ({
+          ...entry,
+          // 确保数值类型正确
+          kcal: parseFloat(entry.kcal) || 0,
+          carbs: parseFloat(entry.carbs) || 0,
+          protein: parseFloat(entry.protein) || 0,
+          fat: parseFloat(entry.fat) || 0,
+          amount: parseFloat(entry.amount) || 0,
+          // 确保日期格式正确
+          date: entry.date instanceof Date ? entry.date.toISOString().split('T')[0] : 
+                typeof entry.date === 'string' ? entry.date.split('T')[0] : entry.date
+        }));
+        
+        set({ diaryEntries: formattedEntries });
         set({ diaryEntries: response.entries });
       } else {
         console.log('服务器返回空日记条目');
@@ -282,9 +297,23 @@ export const useAppStore = create((set, get) => ({
       const response = await API.createDiaryEntry(entryWithUid);
       
       if (response.success) {
+        // 格式化响应数据
+        const formattedEntry = {
+          ...response.entry,
+          kcal: parseFloat(response.entry.kcal) || 0,
+          carbs: parseFloat(response.entry.carbs) || 0,
+          protein: parseFloat(response.entry.protein) || 0,
+          fat: parseFloat(response.entry.fat) || 0,
+          amount: parseFloat(response.entry.amount) || 0,
+          date: response.entry.date instanceof Date ? 
+                response.entry.date.toISOString().split('T')[0] : 
+                typeof response.entry.date === 'string' ? 
+                response.entry.date.split('T')[0] : response.entry.date
+        };
+        
         // 更新本地状态
         set((state) => ({
-          diaryEntries: [...state.diaryEntries, response.entry]
+          diaryEntries: [...state.diaryEntries, formattedEntry]
         }));
         console.log('日记条目保存成功');
       }

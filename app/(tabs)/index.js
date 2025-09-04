@@ -29,7 +29,8 @@ export default function HomeScreen() {
     getTodaysStats,
     getTodaysExercises,
     myMeals,
-    loadUserMeals
+    loadUserMeals,
+    loadTodaysDiaryEntries
   } = useAppStore();
 
   const [showGoalsModal, setShowGoalsModal] = useState(false);
@@ -41,6 +42,8 @@ export default function HomeScreen() {
     } else {
       // 确保加载用户餐食数据
       loadUserMeals();
+      // 加载今天的日记条目
+      loadTodaysDiaryEntries();
     }
   }, [isOnboarded]);
 
