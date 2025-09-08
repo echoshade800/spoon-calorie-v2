@@ -245,8 +245,11 @@ export default function HomeScreen() {
               </View>
               <View>
                 <Text style={styles.statTime}>
-                  {Math.floor(todaysExercises.reduce((sum, ex) => sum + ex.durationMin, 0) / 60)}:
-                  {String(todaysExercises.reduce((sum, ex) => sum + ex.durationMin, 0) % 60).padStart(2, '0')} hr
+                  {todaysExercises.length > 0 ? (
+                    `${Math.floor(todaysExercises.reduce((sum, ex) => sum + (ex.durationMin || 0), 0) / 60)}:${String(todaysExercises.reduce((sum, ex) => sum + (ex.durationMin || 0), 0) % 60).padStart(2, '0')} hr`
+                  ) : (
+                    '0:00 hr'
+                  )}
                 </Text>
               </View>
             </View>
