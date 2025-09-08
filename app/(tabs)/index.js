@@ -56,10 +56,10 @@ export default function HomeScreen() {
   }
 
   const todaysStats = getTodaysStats();
-  const todaysExercises = getTodaysExercises();
+  const todaysExercises = getTodaysExercises(); // 从数据库获取的运动数据
   const remaining = profile.calorie_goal - todaysStats.kcal;
   const exerciseFromWorkouts = todaysExercises.reduce((sum, ex) => sum + ex.calories, 0);
-  const exercise = exerciseFromWorkouts + (stepsData.caloriesBurned || 0);
+  const exercise = exerciseFromWorkouts + (stepsData.caloriesBurned || 0); // 数据库运动 + 步数
   const adjustedRemaining = remaining + exercise;
   const progress = Math.min((todaysStats.kcal / profile.calorie_goal) * 100, 100);
   

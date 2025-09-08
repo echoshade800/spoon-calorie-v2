@@ -89,7 +89,7 @@ export default function DiaryScreen() {
   }, [selectedDate]);
 
   const todaysEntries = getTodaysEntries();
-  const todaysExercises = getTodaysExercises();
+  const todaysExercises = getTodaysExercises(); // 从数据库获取的运动数据
   const todaysStats = getTodaysStats();
 
   // 计算剩余卡路里
@@ -109,7 +109,7 @@ export default function DiaryScreen() {
       return {
         ...section,
         title: section.title, // Ensure title is preserved
-        data: todaysExercises,
+        data: todaysExercises, // 使用从数据库获取的运动数据
       };
     }
     return {
