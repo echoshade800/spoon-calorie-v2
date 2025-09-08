@@ -99,6 +99,19 @@ export const API = {
     return await apiClient.delete(`/diary/${uid}/${entryId}`);
   },
 
+  // 运动条目相关
+  async getUserExerciseEntries(uid, date) {
+    return await apiClient.get(`/exercise/${uid}/${date}`);
+  },
+
+  async createExerciseEntry(entryData) {
+    return await apiClient.post('/exercise', entryData);
+  },
+
+  async deleteExerciseEntry(uid, entryId) {
+    return await apiClient.delete(`/exercise/${uid}/${entryId}`);
+  },
+
   // 图片识别
   async analyzeFoodImage(imageUri) {
     try {

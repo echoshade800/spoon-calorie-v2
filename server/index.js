@@ -6,6 +6,7 @@ import { User } from './models/User.js';
 import { Food } from './models/Food.js';
 import { MyMeal } from './models/MyMeal.js';
 import { DiaryEntry } from './models/DiaryEntry.js';
+import { ExerciseEntry } from './models/ExerciseEntry.js';
 import { OpenAIService } from './services/openaiService.js';
 
 const app = express();
@@ -347,6 +348,45 @@ app.delete('/api/diary/:uid/:entryId', async (req, res) => {
   } catch (error) {
     console.error('删除日记条目失败:', error);
     res.status(500).json({ error: '删除日记条目失败' });
+  }
+});
+
+// 运动条目相关接口
+app.get('/api/exercise/:uid/:date', async (req, res) => {
+  try {
+    const { uid, date } = req.params;
+    const entries = await ExerciseEntry.findByUserAndDate(uid, date);
+    res.json({ success: true, entries });
+  } catch (error) {
+    console.error('获取运动条目失败:', error);
+    res.status(500).json({ error: '获取运动条目失败' });
+  }
+});
+
+app.post('/api/exercise', async (req, res) => {
+  try {
+    const entryData = req.body;
+    
+    if (!entryData.user_uid || !entryData.date) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+    
+    const entry = await ExerciseEntry.create(entryData);
+    res.json({ success: true, entry });
+  } catch (error) {
+    console.error('创建运动条目失败:', error);
+    res.status(500).json({ error: '创建运动条目失败' });
+  }
+});
+
+app.delete('/api/exercise/:uid/:entryId', async (req, res) => {
+  try {
+    const { uid, entryId } = req.params;
+    await ExerciseEntry.delete(uid, entryId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除运动条目失败:', error);
+    res.status(500).json({ error: '删除运动条目失败' });
   }
 });
 

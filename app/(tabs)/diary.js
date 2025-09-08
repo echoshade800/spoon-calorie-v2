@@ -51,7 +51,8 @@ export default function DiaryScreen() {
     deleteExerciseEntry,
     myMeals,
     loadUserMeals,
-    loadTodaysDiaryEntries
+    loadTodaysDiaryEntries,
+    loadTodaysExerciseEntries
   } = useAppStore();
 
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -62,6 +63,8 @@ export default function DiaryScreen() {
     loadUserMeals();
     // 加载今天的日记条目
     loadTodaysDiaryEntries();
+    // 加载今天的运动条目
+    loadTodaysExerciseEntries();
     
     // Check if we should scroll to exercise section
     const timer = setTimeout(() => {

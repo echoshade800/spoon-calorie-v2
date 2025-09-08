@@ -56,6 +56,9 @@ export const useAppStore = create((set, get) => ({
       // 加载今天的日记条目
       await get().loadTodaysDiaryEntries();
       
+      // 加载今天的运动条目
+      await get().loadTodaysExerciseEntries();
+      
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
       console.error('应用初始化错误:', error);
@@ -202,6 +205,52 @@ export const useAppStore = create((set, get) => ({
     }
   },
   
+  // 加载今天的运动条目
+  loadTodaysExerciseEntries: async () => {
+    try {
+      const localUserData = await StorageUtils.getUserData();
+      const { profile, selectedDate } = get();
+      
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid) {
+        console.log('用户 UID 不存在，跳过加载运动条目');
+        return;
+      }
+      
+      console.log('开始加载今天的运动条目:', userUid, selectedDate);
+      const response = await API.getUserExerciseEntries(userUid, selectedDate);
+      
+      if (response.success && response.entries) {
+        console.log(`成功加载 ${response.entries.length} 个运动条目`);
+        // 转换数据格式以匹配前端期望的格式
+        const formattedEntries = response.entries.map(entry => ({
+          ...entry,
+          // 确保数值类型正确
+          calories: parseFloat(entry.calories) || 0,
+          durationMin: parseInt(entry.duration_min) || 0,
+          distance: entry.distance ? parseFloat(entry.distance) : null,
+          sets: entry.sets ? parseInt(entry.sets) : null,
+          reps: entry.reps ? parseInt(entry.reps) : null,
+          weight: entry.weight ? parseFloat(entry.weight) : null,
+          met: entry.met_value ? parseFloat(entry.met_value) : null,
+          // 确保日期格式正确
+          date: entry.date instanceof Date ? entry.date.toISOString().split('T')[0] : 
+                typeof entry.date === 'string' ? entry.date.split('T')[0] : entry.date
+        }));
+        
+        set({ exerciseEntries: formattedEntries });
+      } else {
+        console.log('服务器返回空运动条目');
+        set({ exerciseEntries: [] });
+      }
+    } catch (error) {
+      console.error('加载运动条目失败:', error);
+      // 加载失败不影响应用使用，保持空数组
+      set({ exerciseEntries: [] });
+    }
+  },
+  
   // 加载今天的日记条目
   loadTodaysDiaryEntries: async () => {
     try {
@@ -235,7 +284,6 @@ export const useAppStore = create((set, get) => ({
         }));
         
         set({ diaryEntries: formattedEntries });
-        set({ diaryEntries: response.entries });
       } else {
         console.log('服务器返回空日记条目');
         set({ diaryEntries: [] });
@@ -363,9 +411,59 @@ export const useAppStore = create((set, get) => ({
     }
   },
   
-  addExerciseEntry: (entry) => set((state) => ({
-    exerciseEntries: [...state.exerciseEntries, entry]
-  })),
+  addExerciseEntry: async (entry) => {
+    try {
+      const localUserData = await StorageUtils.getUserData();
+      const { profile } = get();
+      
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid) {
+        throw new Error('用户 UID 不存在，请重新登录');
+      }
+      
+      // 添加用户 UID 到条目数据
+      const entryWithUid = {
+        ...entry,
+        id: entry.id || `exercise_${Date.now()}`,
+        user_uid: userUid,
+      };
+      
+      // 保存到服务器
+      const response = await API.createExerciseEntry(entryWithUid);
+      
+      if (response.success) {
+        // 格式化响应数据
+        const formattedEntry = {
+          ...response.entry,
+          calories: parseFloat(response.entry.calories) || 0,
+          durationMin: parseInt(response.entry.duration_min) || 0,
+          distance: response.entry.distance ? parseFloat(response.entry.distance) : null,
+          sets: response.entry.sets ? parseInt(response.entry.sets) : null,
+          reps: response.entry.reps ? parseInt(response.entry.reps) : null,
+          weight: response.entry.weight ? parseFloat(response.entry.weight) : null,
+          met: response.entry.met_value ? parseFloat(response.entry.met_value) : null,
+          date: response.entry.date instanceof Date ? 
+                response.entry.date.toISOString().split('T')[0] : 
+                typeof response.entry.date === 'string' ? 
+                response.entry.date.split('T')[0] : response.entry.date
+        };
+        
+        // 更新本地状态
+        set((state) => ({
+          exerciseEntries: [...state.exerciseEntries, formattedEntry]
+        }));
+        console.log('运动条目保存成功');
+      }
+    } catch (error) {
+      console.error('保存运动条目失败:', error);
+      // 即使服务器保存失败，也保存到本地状态
+      set((state) => ({
+        exerciseEntries: [...state.exerciseEntries, { ...entry, id: entry.id || Date.now().toString() }]
+      }));
+      throw error;
+    }
+  },
   
   updateExerciseEntry: (id, updates) => set((state) => ({
     exerciseEntries: state.exerciseEntries.map(entry => 
@@ -373,9 +471,35 @@ export const useAppStore = create((set, get) => ({
     )
   })),
   
-  deleteExerciseEntry: (id) => set((state) => ({
-    exerciseEntries: state.exerciseEntries.filter(entry => entry.id !== id)
-  })),
+  deleteExerciseEntry: async (id) => {
+    try {
+      const localUserData = await StorageUtils.getUserData();
+      const { profile } = get();
+      
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid) {
+        throw new Error('用户 UID 不存在，请重新登录');
+      }
+      
+      // 从服务器删除
+      await API.deleteExerciseEntry(userUid, id);
+      
+      // 更新本地状态
+      set((state) => ({
+        exerciseEntries: state.exerciseEntries.filter(entry => entry.id !== id)
+      }));
+      
+      console.log('运动条目删除成功');
+    } catch (error) {
+      console.error('删除运动条目失败:', error);
+      // 即使服务器删除失败，也从本地状态删除
+      set((state) => ({
+        exerciseEntries: state.exerciseEntries.filter(entry => entry.id !== id)
+      }));
+      throw error;
+    }
+  },
   
   addCustomFood: async (food) => {
     try {
