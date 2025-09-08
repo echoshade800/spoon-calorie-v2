@@ -234,9 +234,8 @@ export const useAppStore = create((set, get) => ({
           reps: entry.reps ? parseInt(entry.reps) : null,
           weight: entry.weight ? parseFloat(entry.weight) : null,
           met: entry.met_value ? parseFloat(entry.met_value) : null,
-          // 确保日期格式正确
-          date: entry.date instanceof Date ? entry.date.toISOString().split('T')[0] : 
-                typeof entry.date === 'string' ? entry.date.split('T')[0] : entry.date
+          // 保持数据库原始日期格式（已经是 YYYY-MM-DD 格式）
+          date: entry.date
         }));
         
         set({ exerciseEntries: formattedEntries });
@@ -278,9 +277,8 @@ export const useAppStore = create((set, get) => ({
           protein: parseFloat(entry.protein) || 0,
           fat: parseFloat(entry.fat) || 0,
           amount: parseFloat(entry.amount) || 0,
-          // 确保日期格式正确
-          date: entry.date instanceof Date ? entry.date.toISOString().split('T')[0] : 
-                typeof entry.date === 'string' ? entry.date.split('T')[0] : entry.date
+          // 保持数据库原始日期格式（已经是 YYYY-MM-DD 格式）
+          date: entry.date
         }));
         
         set({ diaryEntries: formattedEntries });

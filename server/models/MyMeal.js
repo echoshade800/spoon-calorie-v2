@@ -5,7 +5,9 @@ export class MyMeal {
     try {
       const escapedUid = userUid.replace(/'/g, "''");
       const sql = `
-        SELECT m.*, 
+        SELECT m.id, m.user_uid, m.name, m.photo, m.total_kcal, m.total_carbs, m.total_protein, m.total_fat, 
+               m.directions, m.source, DATE_FORMAT(m.created_at, '%Y-%m-%d %H:%i:%s') as created_at, 
+               DATE_FORMAT(m.updated_at, '%Y-%m-%d %H:%i:%s') as updated_at,
                GROUP_CONCAT(
                  CONCAT(
                    '{"id":"', mi.id, '",',

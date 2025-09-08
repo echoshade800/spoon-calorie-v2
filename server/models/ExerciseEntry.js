@@ -7,7 +7,9 @@ export class ExerciseEntry {
       const escapedDate = date.replace(/'/g, "''");
       
       const sql = `
-        SELECT * FROM exercise_entries 
+        SELECT id, user_uid, DATE_FORMAT(date, '%Y-%m-%d') as date, time, category, name, duration_min,
+               calories, distance, sets, reps, weight, notes, met_value, created_at, updated_at
+        FROM exercise_entries 
         WHERE user_uid = '${escapedUid}' AND date = '${escapedDate}'
         ORDER BY created_at ASC
       `;

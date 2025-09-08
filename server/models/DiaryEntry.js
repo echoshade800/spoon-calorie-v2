@@ -7,7 +7,9 @@ export class DiaryEntry {
       const escapedDate = date.replace(/'/g, "''");
       
       const sql = `
-        SELECT * FROM diary_entries 
+        SELECT id, user_uid, DATE_FORMAT(date, '%Y-%m-%d') as date, meal_type, food_id, food_name, custom_name,
+               amount, unit, source, kcal, carbs, protein, fat, created_at, updated_at
+        FROM diary_entries 
         WHERE user_uid = '${escapedUid}' AND date = '${escapedDate}'
         ORDER BY created_at ASC
       `;

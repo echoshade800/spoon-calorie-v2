@@ -163,7 +163,7 @@ export default function ExerciseDetailsScreen() {
         `${exerciseEntry.name} · ${calculatedCalories} kcal burned`,
         [
           { text: 'Undo', style: 'destructive', onPress: () => {/* TODO: Implement undo */} },
-          { text: 'OK', style: 'default', onPress: () => router.replace('/diary') }
+          { text: 'OK', style: 'default', onPress: () => router.replace('/(tabs)') }
         ]
       );
     } catch (error) {
