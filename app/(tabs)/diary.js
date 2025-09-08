@@ -44,7 +44,7 @@ export default function DiaryScreen() {
     selectedDate,
     setSelectedDate,
     getTodaysEntries,
-    getTodaysExercises,
+    exerciseEntries,
     getTodaysStats,
     profile,
     deleteDiaryEntry,
@@ -52,7 +52,8 @@ export default function DiaryScreen() {
     myMeals,
     loadUserMeals,
     loadTodaysDiaryEntries,
-    loadTodaysExerciseEntries
+    loadTodaysExerciseEntries,
+    getTodaysExercises
   } = useAppStore();
 
   const [showDatePicker, setShowDatePicker] = useState(false);

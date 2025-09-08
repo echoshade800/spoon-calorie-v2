@@ -27,11 +27,12 @@ export default function HomeScreen() {
     isOnboarded, 
     selectedDate,
     getTodaysStats,
-    getTodaysExercises,
+    exerciseEntries,
     myMeals,
     loadUserMeals,
     loadTodaysDiaryEntries,
-    loadTodaysExerciseEntries
+    loadTodaysExerciseEntries,
+    getTodaysExercises
   } = useAppStore();
 
   const [showGoalsModal, setShowGoalsModal] = useState(false);
