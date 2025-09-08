@@ -82,6 +82,12 @@ export default function DiaryScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  // 当选择的日期改变时，重新加载数据
+  React.useEffect(() => {
+    loadTodaysDiaryEntries();
+    loadTodaysExerciseEntries();
+  }, [selectedDate]);
+
   const todaysEntries = getTodaysEntries();
   const todaysExercises = getTodaysExercises();
   const todaysStats = getTodaysStats();
