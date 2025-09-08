@@ -113,7 +113,6 @@ export default function AddScreen() {
         scrollViewRef.current?.scrollTo({ y: storedPosition, animated: false });
       }, 100);
     }
-  }, [params.tab]);
 
   const handleQuickAdd = (food) => {
     // Get default serving

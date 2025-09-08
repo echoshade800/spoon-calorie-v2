@@ -39,17 +39,14 @@ export default function HomeScreen() {
   const stepsData = useStepsData();
 
   useEffect(() => {
-    if (!isOnboarded) {
-      router.replace('/onboarding');
-    } else {
-      // 确保加载用户餐食数据
-      loadUserMeals();
-      // 加载今天的日记条目
-      loadTodaysDiaryEntries();
-      // 加载今天的运动条目
-      loadTodaysExerciseEntries();
-    }
-  }, [isOnboarded]);
+    // 只在首次加载时检查，不要在每次 tab 切换时检查
+    // 确保加载用户餐食数据
+    loadUserMeals();
+    // 加载今天的日记条目
+    loadTodaysDiaryEntries();
+    // 加载今天的运动条目
+    loadTodaysExerciseEntries();
+  }, []); // 空依赖数组，只在组件挂载时执行一次
 
   if (!isOnboarded || !profile) {
     return null;

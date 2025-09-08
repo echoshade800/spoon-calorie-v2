@@ -67,20 +67,7 @@ export default function DiaryScreen() {
     // 加载今天的运动条目
     loadTodaysExerciseEntries();
     
-    // Check if we should scroll to exercise section
-    const timer = setTimeout(() => {
-      if (sectionListRef.current) {
-        sectionListRef.current.scrollToLocation({
-          sectionIndex: EXERCISE_SECTION_INDEX,
-          itemIndex: 0,
-          animated: true,
-          viewPosition: 0.5, // Center the section on screen
-        });
-      }
-    }, 300); // Small delay to ensure component is mounted
-
-    return () => clearTimeout(timer);
-  }, []);
+  }, []); // 只在组件挂载时执行一次
 
   // 当选择的日期改变时，重新加载数据
   React.useEffect(() => {

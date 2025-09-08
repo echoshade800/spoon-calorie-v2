@@ -73,6 +73,7 @@ export const useAppStore = create((set, get) => ({
       
       if (!localUserData) {
         console.log('本地无用户数据');
+        set({ isOnboarded: false });
         return;
       }
       
@@ -104,15 +105,13 @@ export const useAppStore = create((set, get) => ({
       
       // 如果服务器没有数据，检查本地数据是否完整
       const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
-                               localUserData.height_cm && localUserData.weight_kg && 
-                               localUserData.activity_level && localUserData.goal_type && 
-                               localUserData.calorie_goal && localUserData.bmr && 
-                               localUserData.tdee;
 
       // 更新本地状态
       set({ profile: localUserData, isOnboarded: isCompleteProfile });
+      console.log('本地用户数据加载完成，isOnboarded:', isCompleteProfile);
     } catch (error) {
       console.error('加载本地用户数据错误:', error);
+      set({ isOnboarded: false });
     }
   },
   

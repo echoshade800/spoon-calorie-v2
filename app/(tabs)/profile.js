@@ -29,7 +29,7 @@ const MACRO_PRESETS = [
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, setProfile } = useAppStore();
+  const { profile, setProfile, updateProfile } = useAppStore();
   
   const [editingGoals, setEditingGoals] = useState(false);
   const [editingMacros, setEditingMacros] = useState(false);

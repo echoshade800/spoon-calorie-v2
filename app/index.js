@@ -11,7 +11,7 @@ import { useAppStore } from '@/stores/useAppStore';
 
 export default function IndexScreen() {
   const router = useRouter();
-  const { isOnboarded, setSelectedDate, initializeApp, isDatabaseReady } = useAppStore();
+  const { isOnboarded, setSelectedDate, initializeApp, isDatabaseReady, profile } = useAppStore();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -32,13 +32,15 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isReady || !isDatabaseReady) return;
 
-    // Navigate based on onboarding status
-    if (isOnboarded) {
+    // Navigate based on onboarding status and profile completeness
+    const hasCompleteProfile = profile && profile.calorie_goal && profile.bmr && profile.tdee;
+    
+    if (isOnboarded && hasCompleteProfile) {
       router.replace('/(tabs)');
     } else {
       router.replace('/onboarding');
     }
-  }, [isOnboarded, isReady, isDatabaseReady]);
+  }, [isOnboarded, isReady, isDatabaseReady, profile]);
 
   // Loading state - in a real app might show splash screen
   return <View style={styles.container} />;
