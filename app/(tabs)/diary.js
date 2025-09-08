@@ -58,16 +58,12 @@ export default function DiaryScreen() {
 
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Handle navigation from home exercise card
+  // 数据加载
   React.useEffect(() => {
-    // 确保加载用户餐食数据
     loadUserMeals();
-    // 加载今天的日记条目
     loadTodaysDiaryEntries();
-    // 加载今天的运动条目
     loadTodaysExerciseEntries();
-    
-  }, []); // 只在组件挂载时执行一次
+  }, []);
 
   // 当选择的日期改变时，重新加载数据
   React.useEffect(() => {
@@ -395,6 +391,9 @@ export default function DiaryScreen() {
         contentContainerStyle={styles.listContent}
         stickySectionHeadersEnabled={false}
         style={styles.sectionList}
+        onScrollToIndexFailed={(info) => {
+          console.warn('ScrollToIndex failed:', info);
+        }}
       />
       
       {renderDatePickerModal()}
