@@ -76,14 +76,14 @@ export default function DiaryScreen() {
   const todaysStats = getTodaysStats();
 
   // 计算剩余卡路里
-  const goal = profile?.calorie_goal || 2000;
-  const food = todaysStats.kcal;
+  const goal = profile?.calorie_goal || 0;
+  const food = todaysStats?.kcal || 0;
   const exerciseFromWorkouts = todaysExercises.reduce((sum, ex) => sum + ex.calories, 0);
   const exercise = exerciseFromWorkouts + (stepsData.caloriesBurned || 0);
   const remaining = goal - food + exercise;
 
   // 进度计算
-  const consumedProgress = Math.min((food / goal) * 100, 100);
+  const consumedProgress = goal > 0 ? Math.min((food / goal) * 100, 100) : 0;
   const isOverGoal = remaining < 0;
 
   // 准备餐次数据
@@ -163,17 +163,23 @@ export default function DiaryScreen() {
         {/* 右侧：Goal/Food/Exercise */}
         <View style={styles.metricsSection}>
           <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{formatCalories(goal)}</Text>
+            <Text style={styles.metricValue}>
+              {isNaN(goal) || goal === 0 ? '-' : formatCalories(goal)}
+            </Text>
             <Text style={styles.metricLabel}>Goal</Text>
           </View>
           
           <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{formatCalories(food)}</Text>
+            <Text style={styles.metricValue}>
+              {isNaN(food) ? '-' : formatCalories(food)}
+            </Text>
             <Text style={styles.metricLabel}>Food</Text>
           </View>
           
           <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{formatCalories(exercise)}</Text>
+            <Text style={styles.metricValue}>
+              {isNaN(exercise) ? '-' : formatCalories(exercise)}
+            </Text>
             <Text style={styles.metricLabel}>Exercise</Text>
           </View>
         </View>
@@ -211,7 +217,7 @@ export default function DiaryScreen() {
           styles.sectionCalories,
           { color: sectionTotal > 0 ? '#4CAF50' : '#8E8E93' }
         ]}>
-          {sectionTotal > 0 ? `${formatCalories(sectionTotal)} ${section.key === 'exercise' ? 'kcal burned' : 'kcal'}` : ''}
+          {isNaN(remaining) ? '-' : formatCalories(Math.abs(remaining))}
         </Text>
       </View>
     );

@@ -54,11 +54,13 @@ export default function HomeScreen() {
 
   const todaysStats = getTodaysStats();
   const todaysExercises = getTodaysExercises(); // 从数据库获取的运动数据
-  const remaining = profile.calorie_goal - todaysStats.kcal;
+  const goal = profile?.calorie_goal || 0;
+  const food = todaysStats?.kcal || 0;
   const exerciseFromWorkouts = todaysExercises.reduce((sum, ex) => sum + ex.calories, 0);
   const exercise = exerciseFromWorkouts + (stepsData.caloriesBurned || 0); // 数据库运动 + 步数
+  const remaining = goal - food;
   const adjustedRemaining = remaining + exercise;
-  const progress = Math.min((todaysStats.kcal / profile.calorie_goal) * 100, 100);
+  const progress = goal > 0 ? Math.min((food / goal) * 100, 100) : 0;
   
   const getProgressColor = () => {
     if (adjustedRemaining > 200) return '#007AFF'; // Blue like MyFitnessPal
@@ -96,7 +98,7 @@ export default function HomeScreen() {
               >
                 <View style={styles.progressContent}>
                   <Text style={styles.remainingNumber}>
-                    {formatCalories(Math.abs(adjustedRemaining))}
+                    {isNaN(adjustedRemaining) ? '-' : formatCalories(Math.abs(adjustedRemaining))}
                   </Text>
                   <Text style={styles.remainingLabel}>Remaining</Text>
                 </View>
@@ -111,7 +113,9 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.metricContent}>
                   <Text style={styles.metricLabel}>Base Goal</Text>
-                  <Text style={styles.metricValue}>{formatCalories(profile.calorie_goal)}</Text>
+                  <Text style={styles.metricValue}>
+                    {isNaN(goal) || goal === 0 ? '-' : formatCalories(goal)}
+                  </Text>
                 </View>
               </View>
               
@@ -121,7 +125,9 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.metricContent}>
                   <Text style={styles.metricLabel}>Food</Text>
-                  <Text style={styles.metricValue}>{formatCalories(todaysStats.kcal)}</Text>
+                  <Text style={styles.metricValue}>
+                    {isNaN(food) ? '-' : formatCalories(food)}
+                  </Text>
                 </View>
               </View>
               
@@ -131,7 +137,9 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.metricContent}>
                   <Text style={styles.metricLabel}>Exercise</Text>
-                  <Text style={styles.metricValue}>{formatCalories(exercise)}</Text>
+                  <Text style={styles.metricValue}>
+                    {isNaN(exercise) ? '-' : formatCalories(exercise)}
+                  </Text>
                 </View>
               </View>
             </View>
