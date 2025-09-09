@@ -20,33 +20,58 @@ export class OpenAIService {
               content: [
                 {
                   type: 'text',
-                  text: `请分析这张食物图片，识别出所有食物并估算营养信息。请以JSON格式返回，包含以下字段：
-                  [
-                    {
-                      "name": "食物名称",
-                      "confidence": 0.95,
-                      "kcal_per_100g": 每100克卡路里,
-                      "servingText": "份量描述",
-                      "units": [
-                        {"label": "1份", "grams": 100},
-                        {"label": "100g", "grams": 100}
-                      ],
-                      "macros": {
-                        "carbs": 碳水化合物克数,
-                        "protein": 蛋白质克数,
-                        "fat": 脂肪克数
-                      },
-                      "serving_label": "默认份量标签",
-                      "grams_per_serving": 默认份量克数
-                    }
-                  ]
-                  
-                  请确保：
-                  1. 只识别明确可见的食物
-                  2. 提供合理的营养估算（每100克为基准）
-                  3. 置信度反映识别的确定性
-                  4. 返回纯JSON格式，不要其他文字
-                  5. 如果无法识别任何食物，返回空数组 []`
+                  text: `你需要分析输入的食物图片，并返回严格 JSON 格式，结构如下：
+{
+  "items": [
+    {
+      "name": "食物名称",
+      "type": "packaged | unpackaged", 
+      "confidence": 0.95,
+      "servingText": "包装或食物上的份量描述，如 '500ml瓶装' 或 '一碗'",
+      "units": [
+        {"label": "1份", "grams": 克数},
+        {"label": "100g", "grams": 100}
+      ],
+      "grams_per_serving": 默认份量克数（整数，若是液体需按密度≈1.03 g/ml换算），
+      "kcal_per_100g": 每100克卡路里（整数，参考权威数据库如 USDA 或中国营养成分表），
+      "macros": {
+        "carbs": 每份碳水克数,
+        "protein": 每份蛋白质克数,
+        "fat": 每份脂肪克数,
+        "cholesterol": 每份胆固醇毫克,
+        "sodium": 每份钠毫克
+      },
+      "micros": {
+        "calcium": 每份钙毫克, 
+        "iron": 每份铁毫克, 
+        "potassium": 每份钾毫克, 
+        "vitaminC": 每份维生素C毫克
+      }
+    }
+  ],
+  "totals": {
+    "grams": 所有食物重量总和,
+    "kcal": 总卡路里,
+    "carbs": 总碳水克数,
+    "protein": 总蛋白质克数,
+    "fat": 总脂肪克数,
+    "cholesterol": 总胆固醇毫克,
+    "sodium": 总钠毫克,
+    "calcium": 总钙毫克,
+    "iron": 总铁毫克,
+    "potassium": 总钾毫克,
+    "vitaminC": 总维生素C毫克
+  }
+}
+⚠️ 规则：
+1. 只识别图片中明确可见的食物，忽略餐具、装饰。
+2. 包装食品优先使用包装上的重量/毫升信息，若为液体需按密度≈1.03 g/ml 转换为克。
+3. 无包装食物需估算重量（如：米饭一碗≈150g）。
+4. 营养数值计算方式：  
+   - 每份营养 = grams_per_serving ÷ 100 × 每100g营养值  
+   - totals = 所有 items 营养值的加和  
+5. 营养值必须与常见数据库一致，不允许直接套用错误数据。若计算结果与已知食品常识差异过大（>10%），请自动校正。  
+6. 严格输出 JSON，不能有额外文字或解释。`
                 },
                 {
                   type: 'image_url',
