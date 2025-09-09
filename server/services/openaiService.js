@@ -93,8 +93,46 @@ export class OpenAIService {
         
         console.log('清理后的内容:', cleanContent);
         
-        const foods = JSON.parse(cleanContent);
-        return Array.isArray(foods) ? foods : [];
+        const result = JSON.parse(cleanContent);
+        
+        // 验证返回格式是否符合新的结构
+        if (result && result.items && Array.isArray(result.items)) {
+          // 转换为前端期望的格式
+          const convertedFoods = result.items.map((item, index) => ({
+            id: `openai_${Date.now()}_${index}`,
+            name: item.name,
+            confidence: item.confidence || 0.8,
+            calories: item.kcal_per_100g || 0,
+            servingText: item.servingText || '100g',
+            units: item.units || [
+              { label: '100 g', grams: 100 },
+              { label: '1 g', grams: 1 },
+              ...(item.grams_per_serving ? [
+                { label: '1份', grams: item.grams_per_serving }
+              ] : [])
+            ],
+            macros: {
+              carbs: item.macros?.carbs || 0,
+              protein: item.macros?.protein || 0,
+              fat: item.macros?.fat || 0,
+            },
+            selectedUnit: item.units?.[0] || { label: '100 g', grams: 100 },
+            servings: 1,
+            source: 'openai',
+            // 新增字段
+            type: item.type || 'unpackaged',
+            grams_per_serving: item.grams_per_serving || 100,
+            kcal_per_100g: item.kcal_per_100g || 0,
+            micros: item.micros || {},
+          }));
+          
+          console.log(`OpenAI 识别到 ${convertedFoods.length} 种食物，总计 ${result.totals?.kcal || 0} 卡路里`);
+          return convertedFoods;
+        }
+        
+        // 如果格式不匹配，返回空数组
+        console.log('OpenAI 返回格式不匹配，返回空数组');
+        return [];
       } catch (parseError) {
         console.error('解析OpenAI响应失败:', parseError);
         console.error('原始内容:', content);
