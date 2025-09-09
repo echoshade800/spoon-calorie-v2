@@ -99,6 +99,9 @@ export default function OnboardingScreen() {
       // Save profile locally and mark onboarding complete
       setProfile(completeProfile);
       
+      // 注释掉本地存储保存
+      // await StorageUtils.setUserData(completeProfile);
+      
       // 异步同步到服务器（不阻塞用户进入应用）
       setTimeout(async () => {
         try {
