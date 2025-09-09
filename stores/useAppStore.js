@@ -118,16 +118,20 @@ export const useAppStore = create((set, get) => ({
   // 用户数据同步
   syncUserData: async () => {
     try {
-      // 使用当前 store 中的 profile 数据，而不是从存储读取
+      // 先尝试从本地存储获取 UID
+      const localUserData = await StorageUtils.getUserData();
       const { profile } = get();
       
-      if (!profile) {
-        console.log('本地无用户数据');
+      // 优先使用本地存储的 UID，其次使用 profile 的 UID
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid || !profile) {
+        console.log('用户 UID 或 profile 不存在，跳过同步');
         return;
       }
       
       // 确保有 UID
-      let finalUid = profile.uid;
+      let finalUid = userUid;
       if (!finalUid) {
         finalUid = StorageUtils.generateUID();
         const updatedProfile = { ...profile, uid: finalUid };
