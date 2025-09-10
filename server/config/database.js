@@ -2,11 +2,11 @@ import mysql from 'mysql2/promise';
 
 // 使用本地数据库配置，避免远程连接超时
 const dbConfig = {
-  host: "localhost",
+  host: "vsa-db-dev.cb462qmg6ec1.us-east-1.rds.amazonaws.com",
   port: 3306,
-  user: "root",
-  password: "",
-  database: "quickkcal_local",
+  user: "miniapp1",
+  password: "miniapp@20251",
+  database: "calorie",
   waitForConnections: true,
   connectionLimit: 5,
   queueLimit: 0,
