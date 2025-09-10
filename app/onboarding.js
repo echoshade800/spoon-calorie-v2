@@ -340,7 +340,9 @@ export default function OnboardingScreen() {
         uid: StorageUtils.generateUID(),
         sex: formData.sex,
         age: age,
+        dateOfBirth: calculateDateOfBirth(age), // 根据年龄计算出生日期
         height_cm: height,
+        startingWeight: weight, // 添加起始体重
         weight_kg: weight,
         goal_weight_kg: parseFloat(formData.goal_weight_kg),
         activity_level: formData.activityLevel,
@@ -352,34 +354,45 @@ export default function OnboardingScreen() {
         macro_f: 30,
         bmr: Math.round(bmr),
         tdee: Math.round(tdee),
+        weeklyGoal: formData.weeklyGoal, // 保存周目标
         // Additional onboarding data
         goals: formData.goals,
         barriers: formData.barriers,
         healthyHabits: formData.healthyHabits,
         mealPlanning: formData.mealPlanning,
         mealPlanOptIn: formData.mealPlanOptIn,
-        weeklyGoal: formData.weeklyGoal,
+        startingWeightDate: new Date().toISOString().split('T')[0], // 记录起始体重日期
       };
 
-      // Save profile and mark onboarding complete
+      // Save profile locally first
+      await StorageUtils.setUserData(completeProfile);
+      
+      // Update app state
       setProfile(completeProfile);
       
-      // Async sync to server (don't block user)
-      setTimeout(async () => {
-        try {
-          const { syncUserData } = useAppStore.getState();
-          await syncUserData();
-          console.log('User data synced to server');
-        } catch (error) {
-          console.error('Background sync failed:', error);
-        }
-      }, 1000);
+      // Sync to server immediately
+      try {
+        const { syncUserData } = useAppStore.getState();
+        await syncUserData();
+        console.log('User data synced to server successfully');
+      } catch (error) {
+        console.error('Server sync failed, but continuing with local data:', error);
+      }
       
       // Navigate to main app
       router.replace('/(tabs)');
     } catch (error) {
+      console.error('Onboarding completion error:', error);
       Alert.alert('Error', 'Failed to complete setup. Please try again.');
     }
+  };
+
+  // Helper function to calculate date of birth from age
+  const calculateDateOfBirth = (age) => {
+    const today = new Date();
+    const birthYear = today.getFullYear() - age;
+    // Use July 1st as default birth date
+    return `${birthYear}-07-01`;
   };
 
   const renderStepContent = () => {

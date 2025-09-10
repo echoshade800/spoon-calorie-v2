@@ -44,15 +44,15 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isReady || !isDatabaseReady) return;
 
-    // Navigate based on onboarding status and profile completeness
-    const hasCompleteProfile = profile && profile.calorie_goal && profile.bmr && profile.tdee;
+    // Navigate based on onboarding status
+    console.log('检查导航条件:', { isOnboarded, profile: !!profile });
     
-    if (isOnboarded && hasCompleteProfile) {
+    if (isOnboarded && profile) {
       router.replace('/(tabs)');
     } else {
       router.replace('/onboarding');
     }
-  }, [isOnboarded, isReady, isDatabaseReady, profile]);
+  }, [isOnboarded, isReady, isDatabaseReady, profile, router]);
 
   // Loading state - in a real app might show splash screen
   return <View style={styles.container} />;
