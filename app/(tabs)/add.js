@@ -616,6 +616,14 @@ export default function AddScreen() {
           <Ionicons name="scan-outline" size={20} color="#4CAF50" />
           <Text style={styles.quickActionText}>Barcode Scan</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.quickActionButton}
+          onPress={() => router.push(`/barcode?meal=${selectedMeal}`)}
+        >
+          <Ionicons name="scan-outline" size={20} color="#4CAF50" />
+          <Text style={styles.quickActionText}>Barcode Scan</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab Content */}
@@ -828,9 +836,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   createButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
     color: '#4CAF50',
+    textAlign: 'center',
   },
 
   // Meal items

@@ -38,6 +38,7 @@ export default function CreateFoodScreen() {
     servingLabel: '',
     gramsPerServing: '',
     brand: '',
+    barcode: params.barcode || '',
   });
   
   const [initialFormData] = useState({
@@ -49,6 +50,7 @@ export default function CreateFoodScreen() {
     servingLabel: '',
     gramsPerServing: '',
     brand: '',
+    barcode: params.barcode || '',
   });
   
   // UI state
