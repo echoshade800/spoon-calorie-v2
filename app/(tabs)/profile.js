@@ -1,10 +1,10 @@
 /**
- * Profile & Settings Screen - User preferences and goals management
+ * Profile & Settings Screen - Complete profile management with inline editing
  * 
- * Purpose: Edit daily goals, macro ratios, preferences, and app settings
- * Extends: Add data export, backup/sync, nutrition insights, streak tracking
+ * Purpose: Mirror all onboarding inputs with inline editing and real-time calorie calculation
+ * Features: Instant BMR/TDEE/goal recalculation, unit conversions, macro editing
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,41 +12,523 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Switch,
   Alert,
+  Modal,
+  StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/useAppStore';
-import { calculateBMR, calculateTDEE, calculateDailyGoal } from '@/data/mockData';
-import { validateProfileData } from '@/utils/helpers';
+
+const ACTIVITY_LEVELS = [
+  { value: 'sedentary', label: 'Sedentary', description: 'Desk job, little exercise', factor: 1.40 },
+  { value: 'lightly_active', label: 'Lightly Active', description: 'Light exercise 1-3 days/week', factor: 1.60 },
+  { value: 'active', label: 'Active', description: 'Moderate exercise 3-5 days/week', factor: 1.80 },
+  { value: 'very_active', label: 'Very Active', description: 'Heavy exercise 6-7 days/week', factor: 2.00 },
+];
+
+const WEEKLY_GOALS = [
+  { value: 'lose_2', label: 'Lose 2.0 lb/week', delta: -1000 },
+  { value: 'lose_1_5', label: 'Lose 1.5 lb/week', delta: -750 },
+  { value: 'lose_1', label: 'Lose 1.0 lb/week', delta: -500 },
+  { value: 'lose_0_5', label: 'Lose 0.5 lb/week', delta: -250 },
+  { value: 'maintain', label: 'Maintain', delta: 0 },
+  { value: 'gain_0_5', label: 'Gain 0.5 lb/week', delta: 250 },
+  { value: 'gain_1', label: 'Gain 1.0 lb/week', delta: 500 },
+];
 
 const MACRO_PRESETS = [
-  { name: 'Balanced', carbs: 45, protein: 25, fat: 30 },
-  { name: 'High Protein', carbs: 35, protein: 35, fat: 30 },
-  { name: 'Low Carb', carbs: 20, protein: 35, fat: 45 },
+  { name: 'Balanced', carbs: 50, protein: 20, fat: 30 },
+  { name: 'Lower Carb', carbs: 35, protein: 30, fat: 35 },
+  { name: 'Higher Protein', carbs: 40, protein: 30, fat: 30 },
 ];
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, setProfile, updateProfile } = useAppStore();
+  const insets = useSafeAreaInsets();
+  const { profile, updateProfile } = useAppStore();
   
-  const [editingGoals, setEditingGoals] = useState(false);
-  const [editingMacros, setEditingMacros] = useState(false);
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [tempGoal, setTempGoal] = useState(profile?.calorie_goal?.toString() || '');
-  const [tempMacros, setTempMacros] = useState({
-    carbs: profile?.macro_c || 45,
-    protein: profile?.macro_p || 25,
-    fat: profile?.macro_f || 30,
-  });
-  const [tempProfile, setTempProfile] = useState({
+  // Form state - initialize from profile
+  const [formData, setFormData] = useState({
     sex: profile?.sex || 'male',
-    age: profile?.age?.toString() || '',
-    height_cm: profile?.height_cm?.toString() || '',
-    weight_kg: profile?.weight_kg?.toString() || '',
+    dateOfBirth: profile?.dateOfBirth || '',
+    height_cm: profile?.height_cm || 170,
+    startingWeight_kg: profile?.startingWeight_kg || profile?.weight_kg || 70,
+    currentWeight_kg: profile?.weight_kg || 70,
+    goalWeight_kg: profile?.goal_weight_kg || 65,
+    activityLevel: profile?.activity_level || 'lightly_active',
+    weeklyGoal: getWeeklyGoalFromDelta(profile?.rate_kcal_per_day || -250),
+    carbPct: profile?.macro_c || 50,
+    proteinPct: profile?.macro_p || 20,
+    fatPct: profile?.macro_f || 30,
   });
   
+  // UI state
+  const [heightUnit, setHeightUnit] = useState('cm');
+  const [weightUnit, setWeightUnit] = useState('kg');
+  const [editingMacros, setEditingMacros] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved'
+  const [saveTimeout, setSaveTimeout] = useState(null);
+
+  // Initialize date of birth from age if not set
+  useEffect(() => {
+    if (!formData.dateOfBirth && profile?.age) {
+      const currentYear = new Date().getFullYear();
+      const birthYear = currentYear - profile.age;
+      setFormData(prev => ({ 
+        ...prev, 
+        dateOfBirth: `${birthYear}-01-01` 
+      }));
+    }
+  }, [profile?.age]);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+    
+    setSaveStatus('saving');
+    const timeout = setTimeout(() => {
+      handleAutoSave();
+    }, 500);
+    
+    setSaveTimeout(timeout);
+    
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [formData]);
+
+  function getWeeklyGoalFromDelta(delta) {
+    const goal = WEEKLY_GOALS.find(g => g.delta === delta);
+    return goal?.value || 'lose_0_5';
+  }
+
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return 25;
+    
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    
+    // Check if birthday hasn't occurred this year
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return Math.max(13, Math.min(100, age));
+  };
+
+  const calculateBMR = () => {
+    const W = formData.currentWeight_kg;
+    const H = formData.height_cm;
+    const A = calculateAge(formData.dateOfBirth);
+    const C = formData.sex === 'male' ? 5 : -161;
+    
+    return 10 * W + 6.25 * H - 5 * A + C;
+  };
+
+  const calculateTDEE = () => {
+    const bmr = calculateBMR();
+    const activity = ACTIVITY_LEVELS.find(a => a.value === formData.activityLevel);
+    return bmr * (activity?.factor || 1.60);
+  };
+
+  const calculateDailyGoal = () => {
+    const tdee = calculateTDEE();
+    const weeklyGoal = WEEKLY_GOALS.find(g => g.value === formData.weeklyGoal);
+    const delta = weeklyGoal?.delta || 0;
+    const goal = tdee + delta;
+    
+    // Round to nearest 10
+    return Math.round(goal / 10) * 10;
+  };
+
+  const calculateMacroGrams = (percentage, isCarb = false, isProtein = false) => {
+    const dailyCalories = calculateDailyGoal();
+    const calories = dailyCalories * (percentage / 100);
+    
+    if (isCarb || isProtein) {
+      return Math.round(calories / 4);
+    } else {
+      return Math.round(calories / 9);
+    }
+  };
+
+  const updateFormData = (key, value) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAutoSave = async () => {
+    try {
+      const age = calculateAge(formData.dateOfBirth);
+      const bmr = Math.round(calculateBMR());
+      const tdee = Math.round(calculateTDEE());
+      const dailyGoal = calculateDailyGoal();
+      const weeklyGoalData = WEEKLY_GOALS.find(g => g.value === formData.weeklyGoal);
+      
+      const updatedProfile = {
+        ...profile,
+        sex: formData.sex,
+        age: age,
+        dateOfBirth: formData.dateOfBirth,
+        height_cm: formData.height_cm,
+        weight_kg: formData.currentWeight_kg,
+        startingWeight_kg: formData.startingWeight_kg,
+        goal_weight_kg: formData.goalWeight_kg,
+        activity_level: formData.activityLevel,
+        rate_kcal_per_day: Math.abs(weeklyGoalData?.delta || 250),
+        goal_type: weeklyGoalData?.delta > 0 ? 'gain' : weeklyGoalData?.delta < 0 ? 'lose' : 'maintain',
+        calorie_goal: dailyGoal,
+        macro_c: formData.carbPct,
+        macro_p: formData.proteinPct,
+        macro_f: formData.fatPct,
+        bmr: bmr,
+        tdee: tdee,
+      };
+
+      updateProfile(updatedProfile);
+      setSaveStatus('saved');
+      
+      // Clear saved status after 2 seconds
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (error) {
+      console.error('Auto-save error:', error);
+      setSaveStatus('');
+    }
+  };
+
+  const convertHeightToCm = (feet, inches) => {
+    return Math.round((feet * 12 + inches) * 2.54);
+  };
+
+  const convertHeightFromCm = (cm) => {
+    const totalInches = cm / 2.54;
+    const feet = Math.floor(totalInches / 12);
+    const inches = Math.round(totalInches % 12);
+    return { feet, inches };
+  };
+
+  const convertWeightToKg = (pounds) => {
+    return Math.round(pounds * 0.453592 * 10) / 10;
+  };
+
+  const convertWeightFromKg = (kg) => {
+    return Math.round(kg * 2.20462 * 10) / 10;
+  };
+
+  const applyMacroPreset = (preset) => {
+    setFormData(prev => ({
+      ...prev,
+      carbPct: preset.carbs,
+      proteinPct: preset.protein,
+      fatPct: preset.fat,
+    }));
+  };
+
+  const adjustMacro = (macro, delta) => {
+    const current = formData[macro];
+    const newValue = Math.max(0, Math.min(100, current + delta));
+    setFormData(prev => ({ ...prev, [macro]: newValue }));
+  };
+
+  const balanceMacros = () => {
+    const total = formData.carbPct + formData.proteinPct + formData.fatPct;
+    if (total === 100) return;
+    
+    const diff = 100 - total;
+    const adjustment = Math.round(diff / 3);
+    
+    setFormData(prev => ({
+      ...prev,
+      carbPct: Math.max(0, prev.carbPct + adjustment),
+      proteinPct: Math.max(0, prev.proteinPct + adjustment),
+      fatPct: Math.max(0, prev.fatPct + (diff - adjustment * 2)),
+    }));
+  };
+
+  const renderProfileHeader = () => {
+    const age = calculateAge(formData.dateOfBirth);
+    const heightDisplay = heightUnit === 'cm' ? 
+      `${formData.height_cm}cm` : 
+      (() => {
+        const { feet, inches } = convertHeightFromCm(formData.height_cm);
+        return `${feet}'${inches}"`;
+      })();
+    const weightDisplay = weightUnit === 'kg' ? 
+      `${formData.currentWeight_kg}kg` : 
+      `${convertWeightFromKg(formData.currentWeight_kg)}lb`;
+
+    return (
+      <View style={styles.profileHeader}>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileTitle}>Your Profile</Text>
+          <View style={styles.profileSummary}>
+            <Text style={styles.profileSummaryText}>
+              {formData.sex === 'male' ? 'Male' : 'Female'} • {age} years • {heightDisplay} • {weightDisplay}
+            </Text>
+            <Ionicons name="create-outline" size={16} color="#2EAD4A" />
+          </View>
+        </View>
+        
+        {/* Save Status */}
+        {saveStatus && (
+          <View style={styles.saveStatus}>
+            {saveStatus === 'saving' ? (
+              <Ionicons name="sync" size={16} color="#2EAD4A" />
+            ) : (
+              <Ionicons name="checkmark-circle" size={16} color="#2EAD4A" />
+            )}
+            <Text style={styles.saveStatusText}>
+              {saveStatus === 'saving' ? 'Saving...' : 'Saved'}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderDailyGoalsCard = () => {
+    const dailyCalories = calculateDailyGoal();
+    
+    return (
+      <View style={styles.dailyGoalsCard}>
+        <Text style={styles.cardTitle}>Daily Goals</Text>
+        <View style={styles.caloriesDisplay}>
+          <Text style={styles.caloriesNumber}>{dailyCalories.toLocaleString()}</Text>
+          <Text style={styles.caloriesLabel}>Daily Calories</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderMacroTargetsCard = () => {
+    const dailyCalories = calculateDailyGoal();
+    const carbGrams = calculateMacroGrams(formData.carbPct, true);
+    const proteinGrams = calculateMacroGrams(formData.proteinPct, false, true);
+    const fatGrams = calculateMacroGrams(formData.fatPct);
+    
+    return (
+      <View style={styles.macroTargetsContainer}>
+        <Text style={styles.cardTitle}>Macro Targets</Text>
+        <View style={styles.macroCards}>
+          <TouchableOpacity 
+            style={styles.macroCard}
+            onPress={() => setEditingMacros(true)}
+          >
+            <Text style={styles.macroPercentage}>{formData.carbPct}%</Text>
+            <Text style={styles.macroGrams}>{carbGrams}g</Text>
+            <Text style={styles.macroLabel}>Carbs</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.macroCard}
+            onPress={() => setEditingMacros(true)}
+          >
+            <Text style={styles.macroPercentage}>{formData.proteinPct}%</Text>
+            <Text style={styles.macroGrams}>{proteinGrams}g</Text>
+            <Text style={styles.macroLabel}>Protein</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.macroCard}
+            onPress={() => setEditingMacros(true)}
+          >
+            <Text style={styles.macroPercentage}>{formData.fatPct}%</Text>
+            <Text style={styles.macroGrams}>{fatGrams}g</Text>
+            <Text style={styles.macroLabel}>Fat</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderMacroEditModal = () => {
+    const totalPct = formData.carbPct + formData.proteinPct + formData.fatPct;
+    const remainingPct = 100 - totalPct;
+    
+    return (
+      <Modal visible={editingMacros} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.macroEditContainer}>
+          <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+          
+          {/* Header */}
+          <View style={[styles.macroEditHeader, { paddingTop: insets.top + 16 }]}>
+            <TouchableOpacity onPress={() => setEditingMacros(false)}>
+              <Text style={styles.macroEditCancel}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.macroEditTitle}>Edit Macro Targets</Text>
+            
+            <TouchableOpacity onPress={() => setEditingMacros(false)}>
+              <Text style={styles.macroEditDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.macroEditContent}>
+            {/* Quick Presets */}
+            <View style={styles.presetsSection}>
+              <Text style={styles.presetsTitle}>Quick Presets</Text>
+              <View style={styles.presetButtons}>
+                {MACRO_PRESETS.map((preset) => (
+                  <TouchableOpacity
+                    key={preset.name}
+                    style={styles.presetButton}
+                    onPress={() => applyMacroPreset(preset)}
+                  >
+                    <Text style={styles.presetButtonText}>{preset.name}</Text>
+                    <Text style={styles.presetButtonSubtext}>
+                      {preset.carbs}% • {preset.protein}% • {preset.fat}%
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Macro Controls */}
+            <View style={styles.macroControlsSection}>
+              <Text style={styles.macroControlsTitle}>Custom Percentages</Text>
+              
+              {/* Carbs */}
+              <View style={styles.macroControlRow}>
+                <Text style={styles.macroControlLabel}>Carbs</Text>
+                <View style={styles.macroControlButtons}>
+                  <TouchableOpacity 
+                    style={styles.macroStepButton}
+                    onPress={() => adjustMacro('carbPct', -1)}
+                  >
+                    <Ionicons name="remove" size={16} color="#666" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.macroValueDisplay}>
+                    <Text style={styles.macroControlValue}>{formData.carbPct}%</Text>
+                    <Text style={styles.macroControlGrams}>
+                      {calculateMacroGrams(formData.carbPct, true)}g
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.macroStepButton}
+                    onPress={() => adjustMacro('carbPct', 1)}
+                  >
+                    <Ionicons name="add" size={16} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Protein */}
+              <View style={styles.macroControlRow}>
+                <Text style={styles.macroControlLabel}>Protein</Text>
+                <View style={styles.macroControlButtons}>
+                  <TouchableOpacity 
+                    style={styles.macroStepButton}
+                    onPress={() => adjustMacro('proteinPct', -1)}
+                  >
+                    <Ionicons name="remove" size={16} color="#666" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.macroValueDisplay}>
+                    <Text style={styles.macroControlValue}>{formData.proteinPct}%</Text>
+                    <Text style={styles.macroControlGrams}>
+                      {calculateMacroGrams(formData.proteinPct, false, true)}g
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.macroStepButton}
+                    onPress={() => adjustMacro('proteinPct', 1)}
+                  >
+                    <Ionicons name="add" size={16} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Fat */}
+              <View style={styles.macroControlRow}>
+                <Text style={styles.macroControlLabel}>Fat</Text>
+                <View style={styles.macroControlButtons}>
+                  <TouchableOpacity 
+                    style={styles.macroStepButton}
+                    onPress={() => adjustMacro('fatPct', -1)}
+                  >
+                    <Ionicons name="remove" size={16} color="#666" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.macroValueDisplay}>
+                    <Text style={styles.macroControlValue}>{formData.fatPct}%</Text>
+                    <Text style={styles.macroControlGrams}>
+                      {calculateMacroGrams(formData.fatPct)}g
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.macroStepButton}
+                    onPress={() => adjustMacro('fatPct', 1)}
+                  >
+                    <Ionicons name="add" size={16} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Total Display */}
+              <View style={styles.macroTotalRow}>
+                <Text style={[
+                  styles.macroTotalText,
+                  totalPct !== 100 && styles.macroTotalError
+                ]}>
+                  Total: {totalPct}% {remainingPct !== 0 && `(${remainingPct > 0 ? '+' : ''}${remainingPct}%)`}
+                </Text>
+                
+                {totalPct !== 100 && (
+                  <TouchableOpacity 
+                    style={styles.balanceButton}
+                    onPress={balanceMacros}
+                  >
+                    <Text style={styles.balanceButtonText}>Balance</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+    );
+  };
+
+  const renderDatePickerModal = () => (
+    <Modal visible={showDatePicker} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.datePickerModal}>
+          <View style={styles.datePickerHeader}>
+            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+              <Text style={styles.datePickerCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.datePickerTitle}>Date of Birth</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+              <Text style={styles.datePickerDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.datePickerContent}>
+            <TextInput
+              style={styles.dateInput}
+              value={formData.dateOfBirth}
+              onChangeText={(text) => updateFormData('dateOfBirth', text)}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#999"
+            />
+            <Text style={styles.dateHint}>
+              Age: {calculateAge(formData.dateOfBirth)} years
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   if (!profile) {
     return (
@@ -65,668 +547,755 @@ export default function ProfileScreen() {
     );
   }
 
-  const handleSaveGoal = () => {
-    const newGoal = parseInt(tempGoal);
-    if (isNaN(newGoal) || newGoal < 800 || newGoal > 5000) {
-      Alert.alert('Invalid Goal', 'Please enter a calorie goal between 800 and 5000');
-      return;
-    }
-
-    setProfile({ ...profile, calorie_goal: newGoal });
-    setEditingGoals(false);
-    Alert.alert('Success', 'Daily calorie goal updated!');
-  };
-
-  const handleSaveMacros = () => {
-    const total = tempMacros.carbs + tempMacros.protein + tempMacros.fat;
-    if (Math.abs(total - 100) > 1) {
-      Alert.alert('Invalid Macros', 'Macro percentages must total 100%');
-      return;
-    }
-
-    setProfile({ 
-      ...profile, 
-      macro_c: tempMacros.carbs,
-      macro_p: tempMacros.protein,
-      macro_f: tempMacros.fat,
-    });
-    setEditingMacros(false);
-    Alert.alert('Success', 'Macro targets updated!');
-  };
-
-  const applyMacroPreset = (preset) => {
-    setTempMacros({
-      carbs: preset.carbs,
-      protein: preset.protein,
-      fat: preset.fat,
-    });
-  };
-
-  const handleSaveProfile = () => {
-    const validation = validateProfileData({
-      age: parseInt(tempProfile.age),
-      height_cm: parseFloat(tempProfile.height_cm),
-      weight_kg: parseFloat(tempProfile.weight_kg),
-    });
-
-    if (!validation.isValid) {
-      Alert.alert('Invalid Input', Object.values(validation.errors)[0]);
-      return;
-    }
-
-    const updatedProfile = {
-      ...profile,
-      sex: tempProfile.sex,
-      age: parseInt(tempProfile.age),
-      height_cm: parseFloat(tempProfile.height_cm),
-      weight_kg: parseFloat(tempProfile.weight_kg),
-    };
-
-    // Recalculate BMR, TDEE, and calorie goal
-    const bmr = calculateBMR(updatedProfile);
-    const tdee = calculateTDEE(bmr, updatedProfile.activity);
-    const dailyGoal = calculateDailyGoal(tdee, updatedProfile.goal_type, updatedProfile.rate_kcal_per_day);
-
-    const finalProfile = {
-      ...updatedProfile,
-      bmr: Math.round(bmr),
-      tdee: Math.round(tdee),
-      calorie_goal: dailyGoal,
-    };
-
-    setProfile(finalProfile);
-    setEditingProfile(false);
-    Alert.alert('Success', 'Profile updated! Your calorie goal has been recalculated.');
-  };
-
-  const renderProfileHeader = () => (
-    <View style={styles.profileHeader}>
-      <View style={styles.avatar}>
-        <Ionicons name="person" size={40} color="#4CAF50" />
-      </View>
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F2F2F7" />
       
-      <View style={styles.profileInfo}>
-        <Text style={styles.profileName}>Your Profile</Text>
-        {editingProfile ? (
-          <View style={styles.profileEditContainer}>
-            <View style={styles.sexSelection}>
-              <Text style={styles.editLabel}>Sex</Text>
-              <View style={styles.sexButtons}>
-                {[
-                  { value: 'male', label: 'Male' },
-                  { value: 'female', label: 'Female' },
-                ].map((sex) => (
-                  <TouchableOpacity
-                    key={sex.value}
-                    style={[
-                      styles.sexButton,
-                      tempProfile.sex === sex.value && styles.selectedSexButton,
-                    ]}
-                    onPress={() => setTempProfile(prev => ({ ...prev, sex: sex.value }))}
-                  >
-                    <Text style={[
-                      styles.sexButtonText,
-                      tempProfile.sex === sex.value && styles.selectedSexButtonText,
-                    ]}>
-                      {sex.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            <View style={styles.profileInputs}>
-              <View style={styles.profileInputGroup}>
-                <Text style={styles.editLabel}>Age</Text>
-                <TextInput
-                  style={styles.profileInput}
-                  value={tempProfile.age}
-                  onChangeText={(text) => setTempProfile(prev => ({ ...prev, age: text }))}
-                  placeholder="Age"
-                  keyboardType="numeric"
-                />
-              </View>
-              
-              <View style={styles.profileInputGroup}>
-                <Text style={styles.editLabel}>Height (cm)</Text>
-                <TextInput
-                  style={styles.profileInput}
-                  value={tempProfile.height_cm}
-                  onChangeText={(text) => setTempProfile(prev => ({ ...prev, height_cm: text }))}
-                  placeholder="Height"
-                  keyboardType="numeric"
-                />
-              </View>
-              
-              <View style={styles.profileInputGroup}>
-                <Text style={styles.editLabel}>Weight (kg)</Text>
-                <TextInput
-                  style={styles.profileInput}
-                  value={tempProfile.weight_kg}
-                  onChangeText={(text) => setTempProfile(prev => ({ ...prev, weight_kg: text }))}
-                  placeholder="Weight"
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.profileEditActions}>
-              <TouchableOpacity 
-                style={styles.cancelProfileButton}
-                onPress={() => {
-                  setTempProfile({
-                    sex: profile?.sex || 'male',
-                    age: profile?.age?.toString() || '',
-                    height_cm: profile?.height_cm?.toString() || '',
-                    weight_kg: profile?.weight_kg?.toString() || '',
-                  });
-                  setEditingProfile(false);
-                }}
-              >
-                <Text style={styles.cancelProfileButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.saveProfileButton}
-                onPress={handleSaveProfile}
-              >
-                <Text style={styles.saveProfileButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <Text style={styles.profileDetails}>
-            {profile.sex === 'male' ? 'Male' : 'Female'} • {profile.age} years • {profile.height_cm}cm • {profile.weight_kg}kg
-          </Text>
-        )}
-      </View>
+      {renderProfileHeader()}
 
-      <TouchableOpacity 
-        style={styles.editProfileButton}
-        onPress={() => {
-          if (editingProfile) {
-            setTempProfile({
-              sex: profile?.sex || 'male',
-              age: profile?.age?.toString() || '',
-              height_cm: profile?.height_cm?.toString() || '',
-              weight_kg: profile?.weight_kg?.toString() || '',
-            });
-            setEditingProfile(false);
-          } else {
-            setTempProfile({
-              sex: profile?.sex || 'male',
-              age: profile?.age?.toString() || '',
-              height_cm: profile?.height_cm?.toString() || '',
-              weight_kg: profile?.weight_kg?.toString() || '',
-            });
-            setEditingProfile(true);
-          }
-        }}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="create-outline" size={20} color="#4CAF50" />
-      </TouchableOpacity>
-    </View>
-  );
+        {/* Sticky Top Cards */}
+        <View style={styles.topCards}>
+          {renderDailyGoalsCard()}
+          {renderMacroTargetsCard()}
+        </View>
 
-  const renderGoalsSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Daily Goals</Text>
-        <TouchableOpacity 
-          onPress={() => setEditingGoals(!editingGoals)}
-          style={styles.editButton}
-        >
-          <Text style={styles.editButtonText}>
-            {editingGoals ? 'Cancel' : 'Edit'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {editingGoals ? (
-        <View style={styles.editContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Daily Calorie Goal</Text>
-            <TextInput
-              style={styles.textInput}
-              value={tempGoal}
-              onChangeText={setTempGoal}
-              placeholder="Enter calorie goal"
-              keyboardType="numeric"
-            />
-          </View>
+        {/* Profile Details */}
+        <View style={styles.detailsSection}>
+          <Text style={styles.sectionTitle}>Profile Details</Text>
           
-          <View style={styles.recommendations}>
-            <Text style={styles.recTitle}>Recommendations based on your profile:</Text>
-            <Text style={styles.recText}>BMR: {profile.bmr} kcal</Text>
-            <Text style={styles.recText}>TDEE: {profile.tdee} kcal</Text>
-            <Text style={styles.recText}>
-              Maintenance: {calculateDailyGoal(profile.tdee, 'maintain', 0)} kcal
-            </Text>
+          {/* Sex */}
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Sex</Text>
+            <View style={styles.segmentedControl}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentButton,
+                  formData.sex === 'male' && styles.selectedSegmentButton
+                ]}
+                onPress={() => updateFormData('sex', 'male')}
+              >
+                <Text style={[
+                  styles.segmentText,
+                  formData.sex === 'male' && styles.selectedSegmentText
+                ]}>
+                  Male
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.segmentButton,
+                  formData.sex === 'female' && styles.selectedSegmentButton
+                ]}
+                onPress={() => updateFormData('sex', 'female')}
+              >
+                <Text style={[
+                  styles.segmentText,
+                  formData.sex === 'female' && styles.selectedSegmentText
+                ]}>
+                  Female
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <TouchableOpacity style={styles.saveButton} onPress={handleSaveGoal}>
-            <Text style={styles.saveButtonText}>Save Goal</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.goalDisplay}>
-          <View style={styles.goalItem}>
-            <Text style={styles.goalValue}>{profile.calorie_goal}</Text>
-            <Text style={styles.goalLabel}>Daily Calories</Text>
+          {/* Date of Birth */}
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Date of Birth</Text>
+            <TouchableOpacity 
+              style={styles.fieldButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.fieldValue}>
+                {formData.dateOfBirth || 'Select date'}
+              </Text>
+              <Text style={styles.fieldSubvalue}>
+                Age: {calculateAge(formData.dateOfBirth)}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
-      )}
-    </View>
-  );
 
-  const renderMacrosSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Macro Targets</Text>
-        <TouchableOpacity 
-          onPress={() => setEditingMacros(!editingMacros)}
-          style={styles.editButton}
-        >
-          <Text style={styles.editButtonText}>
-            {editingMacros ? 'Cancel' : 'Edit'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {editingMacros ? (
-        <View style={styles.editContainer}>
-          <View style={styles.presetButtons}>
-            <Text style={styles.presetTitle}>Quick Presets:</Text>
-            <View style={styles.presetRow}>
-              {MACRO_PRESETS.map((preset) => (
+          {/* Height */}
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Height</Text>
+            <View style={styles.unitFieldContainer}>
+              <View style={styles.unitToggle}>
                 <TouchableOpacity
-                  key={preset.name}
-                  style={styles.presetButton}
-                  onPress={() => applyMacroPreset(preset)}
+                  style={[
+                    styles.unitButton,
+                    heightUnit === 'cm' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setHeightUnit('cm')}
                 >
-                  <Text style={styles.presetButtonText}>{preset.name}</Text>
+                  <Text style={[
+                    styles.unitButtonText,
+                    heightUnit === 'cm' && styles.selectedUnitButtonText
+                  ]}>
+                    cm
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    heightUnit === 'ft' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setHeightUnit('ft')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    heightUnit === 'ft' && styles.selectedUnitButtonText
+                  ]}>
+                    ft/in
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {heightUnit === 'cm' ? (
+                <TextInput
+                  style={styles.unitInput}
+                  value={formData.height_cm.toString()}
+                  onChangeText={(text) => {
+                    const value = parseFloat(text) || 0;
+                    updateFormData('height_cm', Math.max(120, Math.min(230, value)));
+                  }}
+                  keyboardType="numeric"
+                  placeholder="170"
+                />
+              ) : (
+                <View style={styles.heightFtInContainer}>
+                  <TextInput
+                    style={styles.heightFtInput}
+                    value={convertHeightFromCm(formData.height_cm).feet.toString()}
+                    onChangeText={(text) => {
+                      const feet = parseInt(text) || 0;
+                      const { inches } = convertHeightFromCm(formData.height_cm);
+                      const newCm = convertHeightToCm(feet, inches);
+                      updateFormData('height_cm', Math.max(120, Math.min(230, newCm)));
+                    }}
+                    keyboardType="numeric"
+                    placeholder="5"
+                  />
+                  <Text style={styles.heightSeparator}>'</Text>
+                  <TextInput
+                    style={styles.heightInInput}
+                    value={convertHeightFromCm(formData.height_cm).inches.toString()}
+                    onChangeText={(text) => {
+                      const inches = parseInt(text) || 0;
+                      const { feet } = convertHeightFromCm(formData.height_cm);
+                      const newCm = convertHeightToCm(feet, inches);
+                      updateFormData('height_cm', Math.max(120, Math.min(230, newCm)));
+                    }}
+                    keyboardType="numeric"
+                    placeholder="8"
+                  />
+                  <Text style={styles.heightSeparator}>"</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Starting Weight */}
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Starting Weight</Text>
+            <View style={styles.unitFieldContainer}>
+              <View style={styles.unitToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    weightUnit === 'kg' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setWeightUnit('kg')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    weightUnit === 'kg' && styles.selectedUnitButtonText
+                  ]}>
+                    kg
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    weightUnit === 'lb' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setWeightUnit('lb')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    weightUnit === 'lb' && styles.selectedUnitButtonText
+                  ]}>
+                    lb
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TextInput
+                style={styles.unitInput}
+                value={weightUnit === 'kg' ? 
+                  formData.startingWeight_kg.toString() : 
+                  convertWeightFromKg(formData.startingWeight_kg).toString()
+                }
+                onChangeText={(text) => {
+                  const value = parseFloat(text) || 0;
+                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
+                  updateFormData('startingWeight_kg', Math.max(30, Math.min(300, kgValue)));
+                }}
+                keyboardType="numeric"
+                placeholder={weightUnit === 'kg' ? "70" : "154"}
+              />
+            </View>
+          </View>
+
+          {/* Current Weight */}
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Current Weight</Text>
+            <View style={styles.unitFieldContainer}>
+              <View style={styles.unitToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    weightUnit === 'kg' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setWeightUnit('kg')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    weightUnit === 'kg' && styles.selectedUnitButtonText
+                  ]}>
+                    kg
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    weightUnit === 'lb' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setWeightUnit('lb')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    weightUnit === 'lb' && styles.selectedUnitButtonText
+                  ]}>
+                    lb
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TextInput
+                style={styles.unitInput}
+                value={weightUnit === 'kg' ? 
+                  formData.currentWeight_kg.toString() : 
+                  convertWeightFromKg(formData.currentWeight_kg).toString()
+                }
+                onChangeText={(text) => {
+                  const value = parseFloat(text) || 0;
+                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
+                  updateFormData('currentWeight_kg', Math.max(30, Math.min(300, kgValue)));
+                }}
+                keyboardType="numeric"
+                placeholder={weightUnit === 'kg' ? "70" : "154"}
+              />
+            </View>
+          </View>
+
+          {/* Goal Weight */}
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Goal Weight</Text>
+            <View style={styles.unitFieldContainer}>
+              <View style={styles.unitToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    weightUnit === 'kg' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setWeightUnit('kg')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    weightUnit === 'kg' && styles.selectedUnitButtonText
+                  ]}>
+                    kg
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    weightUnit === 'lb' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setWeightUnit('lb')}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    weightUnit === 'lb' && styles.selectedUnitButtonText
+                  ]}>
+                    lb
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TextInput
+                style={styles.unitInput}
+                value={weightUnit === 'kg' ? 
+                  formData.goalWeight_kg.toString() : 
+                  convertWeightFromKg(formData.goalWeight_kg).toString()
+                }
+                onChangeText={(text) => {
+                  const value = parseFloat(text) || 0;
+                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
+                  updateFormData('goalWeight_kg', Math.max(30, Math.min(300, kgValue)));
+                }}
+                keyboardType="numeric"
+                placeholder={weightUnit === 'kg' ? "65" : "143"}
+              />
+            </View>
+          </View>
+
+          {/* Activity Level */}
+          <View style={styles.fieldColumn}>
+            <Text style={styles.fieldLabel}>Activity Level</Text>
+            <View style={styles.radioGroup}>
+              {ACTIVITY_LEVELS.map((activity) => (
+                <TouchableOpacity
+                  key={activity.value}
+                  style={[
+                    styles.radioOption,
+                    formData.activityLevel === activity.value && styles.selectedRadioOption
+                  ]}
+                  onPress={() => updateFormData('activityLevel', activity.value)}
+                >
+                  <View style={styles.radioContent}>
+                    <Text style={[
+                      styles.radioLabel,
+                      formData.activityLevel === activity.value && styles.selectedRadioLabel
+                    ]}>
+                      {activity.label}
+                    </Text>
+                    <Text style={styles.radioDescription}>
+                      {activity.description}
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.radioButton,
+                    formData.activityLevel === activity.value && styles.selectedRadioButton
+                  ]}>
+                    {formData.activityLevel === activity.value && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          <View style={styles.macroSliders}>
-            <View style={styles.macroSlider}>
-              <Text style={styles.macroSliderLabel}>
-                Carbs: {tempMacros.carbs}%
-              </Text>
-              <View style={styles.sliderContainer}>
-                <TouchableOpacity 
-                  onPress={() => setTempMacros(prev => ({ 
-                    ...prev, 
-                    carbs: Math.max(10, prev.carbs - 5) 
-                  }))}
+          {/* Weekly Goal */}
+          <View style={styles.fieldColumn}>
+            <Text style={styles.fieldLabel}>Weekly Goal</Text>
+            <View style={styles.radioGroup}>
+              {WEEKLY_GOALS.map((goal) => (
+                <TouchableOpacity
+                  key={goal.value}
+                  style={[
+                    styles.radioOption,
+                    formData.weeklyGoal === goal.value && styles.selectedRadioOption
+                  ]}
+                  onPress={() => updateFormData('weeklyGoal', goal.value)}
                 >
-                  <Ionicons name="remove" size={20} color="#666" />
+                  <View style={styles.radioContent}>
+                    <Text style={[
+                      styles.radioLabel,
+                      formData.weeklyGoal === goal.value && styles.selectedRadioLabel
+                    ]}>
+                      {goal.label}
+                    </Text>
+                    <Text style={styles.radioDescription}>
+                      {goal.delta > 0 ? '+' : ''}{goal.delta} kcal/day
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.radioButton,
+                    formData.weeklyGoal === goal.value && styles.selectedRadioButton
+                  ]}>
+                    {formData.weeklyGoal === goal.value && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
                 </TouchableOpacity>
-                <View style={[styles.sliderBar, { width: `${tempMacros.carbs}%` }]} />
-                <TouchableOpacity 
-                  onPress={() => setTempMacros(prev => ({ 
-                    ...prev, 
-                    carbs: Math.min(70, prev.carbs + 5) 
-                  }))}
-                >
-                  <Ionicons name="add" size={20} color="#666" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.macroSlider}>
-              <Text style={styles.macroSliderLabel}>
-                Protein: {tempMacros.protein}%
-              </Text>
-              <View style={styles.sliderContainer}>
-                <TouchableOpacity 
-                  onPress={() => setTempMacros(prev => ({ 
-                    ...prev, 
-                    protein: Math.max(10, prev.protein - 5) 
-                  }))}
-                >
-                  <Ionicons name="remove" size={20} color="#666" />
-                </TouchableOpacity>
-                <View style={[styles.sliderBar, { width: `${tempMacros.protein}%`, backgroundColor: '#2196F3' }]} />
-                <TouchableOpacity 
-                  onPress={() => setTempMacros(prev => ({ 
-                    ...prev, 
-                    protein: Math.min(50, prev.protein + 5) 
-                  }))}
-                >
-                  <Ionicons name="add" size={20} color="#666" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.macroSlider}>
-              <Text style={styles.macroSliderLabel}>
-                Fat: {tempMacros.fat}%
-              </Text>
-              <View style={styles.sliderContainer}>
-                <TouchableOpacity 
-                  onPress={() => setTempMacros(prev => ({ 
-                    ...prev, 
-                    fat: Math.max(15, prev.fat - 5) 
-                  }))}
-                >
-                  <Ionicons name="remove" size={20} color="#666" />
-                </TouchableOpacity>
-                <View style={[styles.sliderBar, { width: `${tempMacros.fat}%`, backgroundColor: '#FF9800' }]} />
-                <TouchableOpacity 
-                  onPress={() => setTempMacros(prev => ({ 
-                    ...prev, 
-                    fat: Math.min(60, prev.fat + 5) 
-                  }))}
-                >
-                  <Ionicons name="add" size={20} color="#666" />
-                </TouchableOpacity>
-              </View>
+              ))}
             </View>
           </View>
+        </View>
 
-          <Text style={styles.macroTotal}>
-            Total: {tempMacros.carbs + tempMacros.protein + tempMacros.fat}%
-          </Text>
-
-          <TouchableOpacity style={styles.saveButton} onPress={handleSaveMacros}>
-            <Text style={styles.saveButtonText}>Save Macros</Text>
+        {/* Notifications Section */}
+        <View style={styles.notificationsSection}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          
+          <TouchableOpacity 
+            style={styles.notificationItem}
+            onPress={() => router.push('/reminders')}
+          >
+            <View style={styles.notificationContent}>
+              <Text style={styles.notificationLabel}>Reminders & Notifications</Text>
+              <Text style={styles.notificationDescription}>
+                Meal reminders and notification settings
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.macroDisplay}>
-          <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{profile.macro_c}%</Text>
-            <Text style={styles.macroLabel}>Carbs</Text>
-          </View>
-          <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{profile.macro_p}%</Text>
-            <Text style={styles.macroLabel}>Protein</Text>
-          </View>
-          <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{profile.macro_f}%</Text>
-            <Text style={styles.macroLabel}>Fat</Text>
-          </View>
-        </View>
-      )}
+      </ScrollView>
+
+      {renderMacroEditModal()}
+      {renderDatePickerModal()}
     </View>
-  );
-
-  const renderSettingsSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-      </View>
-      
-      <TouchableOpacity 
-        style={styles.settingItem}
-        onPress={() => router.push('/reminders')}
-      >
-        <View>
-          <Text style={styles.settingLabel}>Reminders & Notifications</Text>
-          <Text style={styles.settingDescription}>Meal reminders and notification settings</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#666" />
-      </TouchableOpacity>
-    </View>
-  );
-
-
-  return (
-    <ScrollView style={styles.container}>
-      {renderProfileHeader()}
-      {renderGoalsSection()}
-      {renderMacrosSection()}
-      {renderSettingsSection()}
-    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F2F2F7',
   },
-  header: {
+  profileHeader: {
+    backgroundColor: '#fff',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#333',
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingTop: 80,
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f8fff8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+    borderBottomColor: '#E5E5EA',
   },
   profileInfo: {
     flex: 1,
   },
-  profileName: {
-    fontSize: 18,
+  profileTitle: {
+    fontSize: 28,
     fontWeight: '700',
-    color: '#333',
+    color: '#000',
+    marginBottom: 8,
+  },
+  profileSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  profileSummaryText: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  saveStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+  },
+  saveStatusText: {
+    fontSize: 14,
+    color: '#2EAD4A',
+    fontWeight: '500',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  topCards: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    gap: 16,
+  },
+  dailyGoalsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 16,
+  },
+  caloriesDisplay: {
+    alignItems: 'center',
+  },
+  caloriesNumber: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: '#2EAD4A',
+    lineHeight: 52,
+  },
+  caloriesLabel: {
+    fontSize: 16,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
+  macroTargetsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  macroCards: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  macroCard: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 80,
+  },
+  macroPercentage: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
-  profileDetails: {
+  macroGrams: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#666',
+    marginBottom: 4,
   },
-  editProfileButton: {
-    padding: 8,
+  macroLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
   },
-  section: {
+  detailsSection: {
     backgroundColor: '#fff',
-    marginBottom: 8,
-    paddingVertical: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 20,
     paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingVertical: 24,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
-  },
-  editButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-  },
-  editButtonText: {
-    fontSize: 16,
-    color: '#4CAF50',
     fontWeight: '600',
-  },
-  editContainer: {
-    paddingHorizontal: 20,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  textInput: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  recommendations: {
-    backgroundColor: '#f8fff8',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  recTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginBottom: 8,
-  },
-  recText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  goalDisplay: {
-    paddingHorizontal: 20,
-  },
-  goalItem: {
-    alignItems: 'center',
-    backgroundColor: '#f8fff8',
-    paddingVertical: 20,
-    borderRadius: 12,
-  },
-  goalValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#4CAF50',
-  },
-  goalLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  presetButtons: {
+    color: '#000',
     marginBottom: 20,
   },
-  presetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  presetRow: {
+  fieldRow: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  presetButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 6,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  presetButtonText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '600',
+  fieldColumn: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  macroSliders: {
-    marginBottom: 16,
-  },
-  macroSlider: {
-    marginBottom: 16,
-  },
-  macroSliderLabel: {
+  fieldLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontWeight: '500',
+    color: '#000',
+    flex: 1,
   },
-  sliderContainer: {
+  fieldButton: {
+    alignItems: 'flex-end',
+  },
+  fieldValue: {
+    fontSize: 16,
+    color: '#2EAD4A',
+    fontWeight: '500',
+  },
+  fieldSubvalue: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  unitFieldContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  sliderBar: {
-    height: 8,
-    backgroundColor: '#4CAF50',
-    borderRadius: 4,
+  unitToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 2,
+  },
+  unitButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  selectedUnitButton: {
+    backgroundColor: '#fff',
+  },
+  unitButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#8E8E93',
+  },
+  selectedUnitButtonText: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  unitInput: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    color: '#000',
+    textAlign: 'center',
+    minWidth: 80,
+  },
+  heightFtInContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  heightFtInput: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 16,
+    color: '#000',
+    textAlign: 'center',
+    width: 40,
+  },
+  heightInInput: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 16,
+    color: '#000',
+    textAlign: 'center',
+    width: 40,
+  },
+  heightSeparator: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 2,
+  },
+  segmentButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  selectedSegmentButton: {
+    backgroundColor: '#fff',
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#8E8E93',
+  },
+  selectedSegmentText: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  radioGroup: {
+    gap: 8,
+    marginTop: 12,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedRadioOption: {
+    borderColor: '#2EAD4A',
+    backgroundColor: '#F8FFF8',
+  },
+  radioContent: {
     flex: 1,
   },
-  macroTotal: {
+  radioLabel: {
     fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    marginBottom: 4,
+  },
+  selectedRadioLabel: {
+    color: '#2EAD4A',
     fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 16,
   },
-  macroDisplay: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
-  },
-  macroItem: {
-    width: '32%',
-    alignItems: 'center',
-    backgroundColor: '#f8fff8',
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  macroValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#4CAF50',
-  },
-  macroLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  settingDescription: {
+  radioDescription: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    color: '#8E8E93',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#C7C7CC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedRadioButton: {
+    borderColor: '#2EAD4A',
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2EAD4A',
+  },
+  notificationsSection: {
+    backgroundColor: '#fff',
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    marginBottom: 4,
+  },
+  notificationDescription: {
+    fontSize: 14,
+    color: '#8E8E93',
   },
   emptyState: {
     flex: 1,
@@ -741,7 +1310,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   setupButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2EAD4A',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -751,97 +1320,206 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  profileEditContainer: {
+  
+  // Macro Edit Modal
+  macroEditContainer: {
     flex: 1,
-   marginTop: 8,
+    backgroundColor: '#F2F2F7',
   },
-  sexSelection: {
+  macroEditHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  macroEditCancel: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  macroEditTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  macroEditDone: {
+    fontSize: 16,
+    color: '#2EAD4A',
+    fontWeight: '600',
+  },
+  macroEditContent: {
+    flex: 1,
+  },
+  presetsSection: {
+    backgroundColor: '#fff',
+    marginBottom: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  presetsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
     marginBottom: 16,
   },
-  editLabel: {
+  presetButtons: {
+    gap: 12,
+  },
+  presetButton: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  presetButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2EAD4A',
+    marginBottom: 4,
+  },
+  presetButtonSubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  macroControlsSection: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  macroControlsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 20,
+  },
+  macroControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  macroControlLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    width: 80,
+  },
+  macroControlButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  macroStepButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  macroValueDisplay: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  macroControlValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  macroControlGrams: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  macroTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  macroTotalText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+  },
+  macroTotalError: {
+    color: '#FF3B30',
+  },
+  balanceButton: {
+    backgroundColor: '#2EAD4A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  balanceButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  sexButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  sexButton: {
-    flex: 1,
-   paddingVertical: 10,
-   paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
-   borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    alignItems: 'center',
-  },
-  selectedSexButton: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#f8fff8',
-  },
-  sexButtonText: {
-   fontSize: 15,
-   fontWeight: '500',
-    color: '#333',
-  },
-  selectedSexButtonText: {
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  profileInputs: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-   alignItems: 'flex-end',
-  },
-  profileInputGroup: {
-    flex: 1,
-  },
-  profileInput: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-   borderRadius: 8,
-   paddingVertical: 12,
-   paddingHorizontal: 10,
-   fontSize: 15,
-    textAlign: 'center',
-   color: '#000',
-  },
-  profileEditActions: {
-    flexDirection: 'row',
-    gap: 8,
-   marginTop: 4,
-  },
-  cancelProfileButton: {
-    flex: 1,
-   paddingVertical: 10,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-   borderRadius: 8,
-    alignItems: 'center',
-   justifyContent: 'center',
-  },
-  cancelProfileButtonText: {
-   fontSize: 15,
-    color: '#666',
-    fontWeight: '600',
-  },
-  saveProfileButton: {
-    flex: 1,
-   paddingVertical: 10,
-    backgroundColor: '#4CAF50',
-   borderRadius: 8,
-    alignItems: 'center',
-   justifyContent: 'center',
-  },
-  saveProfileButtonText: {
-   fontSize: 15,
     color: '#fff',
+  },
+  
+  // Date Picker Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 0,
+    width: '85%',
+    maxWidth: 400,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  datePickerTitle: {
+    fontSize: 18,
     fontWeight: '600',
+    color: '#000',
+  },
+  datePickerDone: {
+    fontSize: 16,
+    color: '#2EAD4A',
+    fontWeight: '600',
+  },
+  datePickerContent: {
+    padding: 20,
+  },
+  dateInput: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#000',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  dateHint: {
+    fontSize: 14,
+    color: '#8E8E93',
+    textAlign: 'center',
   },
 });
