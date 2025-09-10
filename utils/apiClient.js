@@ -1,9 +1,8 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
-const Platform = Constants.platform;
 
 // API 基础配置
-const API_BASE_URL = Platform.OS === 'web' 
+const API_BASE_URL = Constants.platform?.OS === 'web' 
   ? 'http://localhost:3001/api'
   : 'http://10.0.2.2:3001/api'; // Android 模拟器使用 10.0.2.2
 
@@ -120,7 +119,7 @@ export const API = {
       const formData = new FormData();
       
       // 处理图片文件
-      if (Platform.OS === 'web') {
+      if (Constants.platform?.OS === 'web') {
         // Web 平台处理
         const response = await fetch(imageUri);
         const blob = await response.blob();
