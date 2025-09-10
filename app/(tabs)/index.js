@@ -41,6 +41,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadInitialData = async () => {
       if (profile?.uid) { // Only load if profile and uid are available
+      }
       try {
         await loadUserMeals();
         await loadTodaysDiaryEntries();
