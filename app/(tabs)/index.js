@@ -72,192 +72,212 @@ export default function HomeScreen() {
   const getProgressColor = () => {
     if (adjustedRemaining > 200) return '#007AFF'; // Blue like MyFitnessPal
     if (adjustedRemaining > 0) return '#FF9500'; // Orange - close
-          <View style={styles.progressContainer}>
-            {/* Progress Ring */}
-            <View style={styles.progressRingContainer}>
-              <ProgressRing
-                size={160}
-                strokeWidth={8}
-                progress={progress}
-                color={getProgressColor()}
-                backgroundColor="#E5E5EA"
-              >
-                <View style={styles.progressContent}>
-                  <Text style={styles.remainingNumber}>
-                    {isNaN(adjustedRemaining) ? '-' : formatCalories(Math.abs(adjustedRemaining))}
-                  </Text>
-                  <Text style={styles.remainingLabel}>Remaining</Text>
-                </View>
-              </ProgressRing>
-            </View>
+    return '#FF3B30'; // Red - over
+  };
 
-            {/* Side Metrics */}
-            <View style={styles.sideMetrics}>
-              <View style={styles.metricRow}>
-                <View style={styles.metricIcon}>
-                  <Ionicons name="flag" size={24} color="#8E8E93" />
-                </View>
-                <View style={styles.metricContent}>
-                  <Text style={styles.metricLabel}>Base Goal</Text>
-                  <Text style={styles.metricValue}>
-                    {isNaN(goal) || goal === 0 ? '-' : formatCalories(goal)}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.metricRow}>
-                <View style={styles.metricIcon}>
-                  <Ionicons name="restaurant" size={24} color="#4CAF50" />
-                </View>
-                <View style={styles.metricContent}>
-                  <Text style={styles.metricLabel}>Food</Text>
-                  <Text style={styles.metricValue}>
-                    {isNaN(food) ? '-' : formatCalories(food)}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.metricRow}>
-                <View style={styles.metricIcon}>
-                  <Ionicons name="flame" size={24} color="#FF9500" />
-                </View>
-                <View style={styles.metricContent}>
-                  <Text style={styles.metricLabel}>Exercise</Text>
-                  <Text style={styles.metricValue}>
-                    {isNaN(exercise) ? '-' : formatCalories(exercise)}
-                  </Text>
-                </View>
-              </View>
-            </View>
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
+        {/* Today Section */}
+        <View style={styles.todaySection}>
+          <View style={styles.todayHeader}>
+            <Text style={styles.todayTitle}>Today</Text>
+            <TouchableOpacity onPress={() => setShowGoalsModal(true)}>
+              <Text style={styles.editButton}>Edit Goals</Text>
+            </TouchableOpacity>
           </View>
 
+          <View style={styles.caloriesCard}>
+            <Text style={styles.caloriesTitle}>Calories</Text>
+            <Text style={styles.caloriesSubtitle}>{formatDate(selectedDate)}</Text>
+            
+            <View style={styles.progressContainer}>
+              {/* Progress Ring */}
+              <View style={styles.progressRingContainer}>
+                <ProgressRing
+                  size={160}
+                  strokeWidth={8}
+                  progress={progress}
+                  color={getProgressColor()}
+                  backgroundColor="#E5E5EA"
+                >
+                  <View style={styles.progressContent}>
+                    <Text style={styles.remainingNumber}>
+                      {isNaN(adjustedRemaining) ? '-' : formatCalories(Math.abs(adjustedRemaining))}
+                    </Text>
+                    <Text style={styles.remainingLabel}>Remaining</Text>
+                  </View>
+                </ProgressRing>
+              </View>
+
+              {/* Side Metrics */}
+              <View style={styles.sideMetrics}>
+                <View style={styles.metricRow}>
+                  <View style={styles.metricIcon}>
+                    <Ionicons name="flag" size={24} color="#8E8E93" />
+                  </View>
+                  <View style={styles.metricContent}>
+                    <Text style={styles.metricLabel}>Base Goal</Text>
+                    <Text style={styles.metricValue}>
+                      {isNaN(goal) || goal === 0 ? '-' : formatCalories(goal)}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.metricRow}>
+                  <View style={styles.metricIcon}>
+                    <Ionicons name="restaurant" size={24} color="#4CAF50" />
+                  </View>
+                  <View style={styles.metricContent}>
+                    <Text style={styles.metricLabel}>Food</Text>
+                    <Text style={styles.metricValue}>
+                      {isNaN(food) ? '-' : formatCalories(food)}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.metricRow}>
+                  <View style={styles.metricIcon}>
+                    <Ionicons name="flame" size={24} color="#FF9500" />
+                  </View>
+                  <View style={styles.metricContent}>
+                    <Text style={styles.metricLabel}>Exercise</Text>
+                    <Text style={styles.metricValue}>
+                      {isNaN(exercise) ? '-' : formatCalories(exercise)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+          </View>
         </View>
-      </View>
 
-      {/* Quick Actions */}
-      <View style={styles.actionsSection}>
-        <TouchableOpacity 
-          style={styles.primaryAction}
-          onPress={() => router.push('/add')}
-        >
-          <Ionicons name="add" size={24} color="#fff" />
-          <Text style={styles.primaryActionText}>Log Food</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Stats */}
-      <View style={styles.bottomStats}>
-        <TouchableOpacity 
-          style={styles.statCard}
-          onPress={() => router.push('/(tabs)/add?tab=meals')}
-        >
-          <View style={styles.statHeader}>
-            <Text style={styles.statTitle}>My Meals</Text>
-            <TouchableOpacity onPress={() => router.push('/create-meal')}>
-              <Ionicons name="add" size={20} color="#4CAF50" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.statContent}>
-            <View style={styles.statIcon}>
-              <Ionicons name="restaurant" size={20} color="#4CAF50" />
-            </View>
-            <View>
-              <Text style={styles.statNumber}>{myMeals.length}</Text>
-              <Text style={styles.statGoal}>Saved meals</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.statCard}
-          onPress={() => {
-            if (!stepsData.hasPermission) {
-              stepsData.requestPermissions();
-            } else if (stepsData.error) {
-              stepsData.refreshSteps();
-            }
-          }}
-        >
-          <View style={styles.statHeader}>
-            <Text style={styles.statTitle}>Steps</Text>
-            {stepsData.isLoading && (
-              <Ionicons name="refresh" size={16} color="#8E8E93" />
-            )}
-            {!stepsData.hasPermission && (
-              <Ionicons name="lock-closed" size={16} color="#FF3B30" />
-            )}
-          </View>
-          <View style={styles.statContent}>
-            <View style={styles.statIcon}>
-              <Ionicons name="footsteps" size={20} color={stepsData.hasPermission ? "#4CAF50" : "#8E8E93"} />
-            </View>
-            <View>
-              <Text style={[
-                styles.statNumber,
-                !stepsData.hasPermission && styles.statNumberDisabled
-              ]}>
-                {stepsData.isLoading ? '...' : stepsData.steps.toLocaleString()}
-              </Text>
-              <Text style={[
-                styles.statGoal,
-                !stepsData.hasPermission && styles.statGoalDisabled
-              ]}>
-                {stepsData.hasPermission ? `Goal: ${stepsData.goal.toLocaleString()} steps` : 'Tap to enable'}
-              </Text>
-              {stepsData.error && (
-                <Text style={styles.statError}>{stepsData.error}</Text>
-              )}
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.statCard}>
-          <View style={styles.statHeader}>
-            <Text style={styles.statTitle}>Exercise</Text>
-            <TouchableOpacity onPress={() => router.push('/exercise')}>
-              <Ionicons name="add" size={20} color="#4CAF50" />
-            </TouchableOpacity>
-          </View>
+        {/* Quick Actions */}
+        <View style={styles.actionsSection}>
           <TouchableOpacity 
-            style={styles.exerciseCardContent}
-            onPress={() => router.push('/diary')}
+            style={styles.primaryAction}
+            onPress={() => router.push('/add')}
           >
-            <View style={styles.statContent}>
-              <View style={styles.statIcon}>
-                <Ionicons name="flame" size={20} color="#FF9500" />
-              </View>
-              <View>
-                <Text style={styles.statNumber}>{formatCalories(exercise)} cal</Text>
-              </View>
+            <Ionicons name="add" size={24} color="#fff" />
+            <Text style={styles.primaryActionText}>Log Food</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Stats */}
+        <View style={styles.bottomStats}>
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={() => router.push('/(tabs)/add?tab=meals')}
+          >
+            <View style={styles.statHeader}>
+              <Text style={styles.statTitle}>My Meals</Text>
+              <TouchableOpacity onPress={() => router.push('/create-meal')}>
+                <Ionicons name="add" size={20} color="#4CAF50" />
+              </TouchableOpacity>
             </View>
             <View style={styles.statContent}>
               <View style={styles.statIcon}>
-                <Ionicons name="time" size={20} color="#FF9500" />
+                <Ionicons name="restaurant" size={20} color="#4CAF50" />
               </View>
               <View>
-                <Text style={styles.statTime}>
-                  {todaysExercises.length > 0 ? (
-                    `${Math.floor(todaysExercises.reduce((sum, ex) => sum + (ex.durationMin || 0), 0) / 60)}:${String(todaysExercises.reduce((sum, ex) => sum + (ex.durationMin || 0), 0) % 60).padStart(2, '0')} hr`
-                  ) : (
-                    '0:00 hr'
-                  )}
-                </Text>
+                <Text style={styles.statNumber}>{myMeals.length}</Text>
+                <Text style={styles.statGoal}>Saved meals</Text>
               </View>
             </View>
           </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Goals Modal */}
-      <CalorieMacroGoalsModal
-        visible={showGoalsModal}
-        onClose={() => setShowGoalsModal(false)}
-        currentGoals={profile}
-        onSave={(newGoals) => {
-          const { updateProfile } = useAppStore.getState();
-          updateProfile(newGoals);
-        }}
-      />
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={() => {
+              if (!stepsData.hasPermission) {
+                stepsData.requestPermissions();
+              } else if (stepsData.error) {
+                stepsData.refreshSteps();
+              }
+            }}
+          >
+            <View style={styles.statHeader}>
+              <Text style={styles.statTitle}>Steps</Text>
+              {stepsData.isLoading && (
+                <Ionicons name="refresh" size={16} color="#8E8E93" />
+              )}
+              {!stepsData.hasPermission && (
+                <Ionicons name="lock-closed" size={16} color="#FF3B30" />
+              )}
+            </View>
+            <View style={styles.statContent}>
+              <View style={styles.statIcon}>
+                <Ionicons name="footsteps" size={20} color={stepsData.hasPermission ? "#4CAF50" : "#8E8E93"} />
+              </View>
+              <View>
+                <Text style={[
+                  styles.statNumber,
+                  !stepsData.hasPermission && styles.statNumberDisabled
+                ]}>
+                  {stepsData.isLoading ? '...' : stepsData.steps.toLocaleString()}
+                </Text>
+                <Text style={[
+                  styles.statGoal,
+                  !stepsData.hasPermission && styles.statGoalDisabled
+                ]}>
+                  {stepsData.hasPermission ? `Goal: ${stepsData.goal.toLocaleString()} steps` : 'Tap to enable'}
+                </Text>
+                {stepsData.error && (
+                  <Text style={styles.statError}>{stepsData.error}</Text>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.statCard}>
+            <View style={styles.statHeader}>
+              <Text style={styles.statTitle}>Exercise</Text>
+              <TouchableOpacity onPress={() => router.push('/exercise')}>
+                <Ionicons name="add" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity 
+              style={styles.exerciseCardContent}
+              onPress={() => router.push('/diary')}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statIcon}>
+                  <Ionicons name="flame" size={20} color="#FF9500" />
+                </View>
+                <View>
+                  <Text style={styles.statNumber}>{formatCalories(exercise)} cal</Text>
+                </View>
+              </View>
+              <View style={styles.statContent}>
+                <View style={styles.statIcon}>
+                  <Ionicons name="time" size={20} color="#FF9500" />
+                </View>
+                <View>
+                  <Text style={styles.statTime}>
+                    {todaysExercises.length > 0 ? (
+                      `${Math.floor(todaysExercises.reduce((sum, ex) => sum + (ex.durationMin || 0), 0) / 60)}:${String(todaysExercises.reduce((sum, ex) => sum + (ex.durationMin || 0), 0) % 60).padStart(2, '0')} hr`
+                    ) : (
+                      '0:00 hr'
+                    )}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Goals Modal */}
+        <CalorieMacroGoalsModal
+          visible={showGoalsModal}
+          onClose={() => setShowGoalsModal(false)}
+          currentGoals={profile}
+          onSave={(newGoals) => {
+            const { updateProfile } = useAppStore.getState();
+            updateProfile(newGoals);
+          }}
+        />
+      </View>
     </ScrollView>
   );
 }
