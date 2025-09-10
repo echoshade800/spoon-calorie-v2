@@ -9,7 +9,7 @@ const API_BASE_URL = Platform.OS === 'web'
 // 创建 axios 实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // 增加超时时间到30秒
   headers: {
     'Content-Type': 'application/json',
   },
@@ -33,17 +33,18 @@ apiClient.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    console.error('API 响应错误:', error);
+    console.warn('API 响应错误:', error);
     
     if (error.code === 'ECONNREFUSED') {
-      throw new Error('无法连接到服务器，请检查网络连接');
+      console.warn('服务器连接被拒绝，可能服务器未启动');
+      throw new Error('服务器暂时不可用');
     }
     
     if (error.response) {
       throw new Error(error.response.data?.error || '服务器错误');
     }
     
-    throw new Error('网络错误，请重试');
+    throw new Error('网络连接失败');
   }
 );
 

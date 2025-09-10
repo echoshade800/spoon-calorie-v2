@@ -44,25 +44,42 @@ export const useAppStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // 初始化数据库连接
-      await initializeDatabase();
+      // 尝试初始化数据库连接，但不阻塞应用启动
+      try {
+        await initializeDatabase();
+      } catch (dbError) {
+        console.warn('数据库连接失败，使用离线模式:', dbError);
+      }
       
       // 只加载本地用户数据，不同步到服务器
       await get().loadLocalUserData();
       
-      // 加载用户的餐食数据
-      await get().loadUserMeals();
+      // 尝试加载用户的餐食数据，失败时继续
+      try {
+        await get().loadUserMeals();
+      } catch (mealsError) {
+        console.warn('加载餐食数据失败:', mealsError);
+      }
       
-      // 加载今天的日记条目
-      await get().loadTodaysDiaryEntries();
+      // 尝试加载今天的日记条目，失败时继续
+      try {
+        await get().loadTodaysDiaryEntries();
+      } catch (diaryError) {
+        console.warn('加载日记条目失败:', diaryError);
+      }
       
-      // 加载今天的运动条目
-      await get().loadTodaysExerciseEntries();
+      // 尝试加载今天的运动条目，失败时继续
+      try {
+        await get().loadTodaysExerciseEntries();
+      } catch (exerciseError) {
+        console.warn('加载运动条目失败:', exerciseError);
+      }
       
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
-      console.error('应用初始化错误:', error);
-      set({ error: '初始化失败', isLoading: false });
+      console.warn('应用初始化警告:', error);
+      // 即使有错误也标记为就绪，允许应用继续运行
+      set({ isDatabaseReady: true, isLoading: false });
     }
   },
   
@@ -301,12 +318,20 @@ export const useAppStore = create((set, get) => ({
   searchFoodsInDatabase: async (query) => {
     try {
       set({ isSearching: true });
-      const results = await searchFoods(query, 30);
+      
+      // 尝试搜索，失败时返回空结果
+      let results = [];
+      try {
+        results = await searchFoods(query, 30);
+      } catch (searchError) {
+        console.warn('搜索食物失败，返回空结果:', searchError);
+        results = [];
+      }
       
       set({ searchResults: results, isSearching: false });
       return results;
     } catch (error) {
-      console.error('搜索食物错误:', error);
+      console.warn('搜索食物错误:', error);
       set({ searchResults: [], isSearching: false });
       return [];
     }
