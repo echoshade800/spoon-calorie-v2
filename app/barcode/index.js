@@ -13,8 +13,8 @@ import {
   Alert,
   Modal,
   StatusBar,
-  Platform,
   Vibration,
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
