@@ -26,26 +26,12 @@ const upload = multer({
 });
 
 // 测试数据库连接
-const initializeDatabase = async () => {
-  const isConnected = await testConnection();
-  if (!isConnected) {
-    console.warn('⚠️  数据库连接失败，服务器将在模拟模式下运行');
-    console.warn('⚠️  某些功能可能不可用，但服务器仍会启动');
-  }
-  return isConnected;
-};
+testConnection();
 
 // 初始化数据库表
 const initializeTables = async () => {
   try {
     console.log('正在初始化数据库表...');
-    
-    // 检查数据库连接
-    const isConnected = await testConnection();
-    if (!isConnected) {
-      console.warn('数据库连接不可用，跳过表初始化');
-      return;
-    }
     
     // 创建用户表
     await executeQuery(`
@@ -208,21 +194,12 @@ const initializeTables = async () => {
     
     console.log('数据库表初始化完成');
   } catch (error) {
-    console.warn('数据库表初始化失败，服务器将在模拟模式下运行:', error.message);
+    console.error('数据库表初始化失败:', error);
   }
 };
 
-// 初始化数据库
-const startServer = async () => {
-  await initializeDatabase();
-  await initializeTables();
-  
-  // 启动服务器
-  app.listen(PORT, () => {
-    console.log(`🚀 QuickKcal API 服务器运行在端口 ${PORT}`);
-    console.log(`📊 健康检查: http://localhost:${PORT}/api/health`);
-  });
-};
+// 初始化数据库表
+initializeTables();
 
 // 用户相关接口
 app.post('/api/users/sync', async (req, res) => {
@@ -438,15 +415,14 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
     message: 'QuickKcal API 服务正常运行',
-    timestamp: new Date().toISOString(),
-    database: 'connected' // 简化状态显示
+    timestamp: new Date().toISOString()
   });
 });
 
-// 启动应用
-startServer().catch(error => {
-  console.error('服务器启动失败:', error);
-  process.exit(1);
+// 启动服务器
+app.listen(PORT, () => {
+  console.log(`🚀 QuickKcal API 服务器运行在端口 ${PORT}`);
+  console.log(`📊 健康检查: http://localhost:${PORT}/api/health`);
 });
 
 export default app;

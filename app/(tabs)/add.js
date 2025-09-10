@@ -608,22 +608,6 @@ export default function AddScreen() {
           <Ionicons name="camera" size={20} color="#4CAF50" />
           <Text style={styles.quickActionText}>Scan Meal</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => router.push(`/barcode?meal=${selectedMeal}`)}
-        >
-          <Ionicons name="scan-outline" size={20} color="#4CAF50" />
-          <Text style={styles.quickActionText}>Barcode Scan</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => router.push(`/barcode?meal=${selectedMeal}`)}
-        >
-          <Ionicons name="scan-outline" size={20} color="#4CAF50" />
-          <Text style={styles.quickActionText}>Barcode Scan</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Tab Content */}
@@ -702,7 +686,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 20,
     marginBottom: 16,
-    gap: 8,
+    gap: 12,
   },
   quickActionButton: {
     flex: 1,
@@ -710,9 +694,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
-    paddingVertical: 24,
+    paddingVertical: 32,
     borderRadius: 12,
-    gap: 6,
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -720,10 +704,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   quickActionText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
     color: '#4CAF50',
-    textAlign: 'center',
   },
 
   // Tab content
@@ -836,10 +819,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   createButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
     color: '#4CAF50',
-    textAlign: 'center',
   },
 
   // Meal items
