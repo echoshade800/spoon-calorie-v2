@@ -19,9 +19,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-const Platform = Constants.platform;
 
 const CATEGORIES = [
   { value: 'cardio', label: 'Cardio', defaultMet: 7.0 },

@@ -21,11 +21,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { useAppStore } from '@/stores/useAppStore';
 import { getMealDisplayName } from '@/utils/helpers';
 
-const Platform = Constants.platform;
 export default function CreateMealScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();

@@ -7,10 +7,9 @@
 import { useState, useEffect } from 'react';
 import { Alert, Linking } from 'react-native';
 import { Pedometer } from 'expo-sensors';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { useAppStore } from '@/stores/useAppStore';
 
-const Platform = Constants.platform;
 // Constants for calorie calculation
 const MET_WALKING = 3.0; // MET value for moderate walking
 const STEPS_PER_HOUR_WALKING = 6000; // Approximate steps per hour for moderate walking

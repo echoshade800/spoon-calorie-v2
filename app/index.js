@@ -13,23 +13,32 @@ export default function IndexScreen() {
   const router = useRouter();
   const { isOnboarded, setSelectedDate, initializeApp, isDatabaseReady, profile } = useAppStore();
   const [isReady, setIsReady] = useState(false);
+  const mounted = React.useRef(true);
 
   useEffect(() => {
+    mounted.current = true;
+    
     // Defer state updates to next event loop cycle to ensure component is mounted
     setTimeout(() => {
-      // Initialize database first
-      initializeApp();
-      
-      // Set today's date
-      setSelectedDate(new Date().toISOString().split('T')[0]);
-      
-      // Mark as ready after a short delay to ensure component is mounted
-      const timer = setTimeout(() => {
-        setIsReady(true);
-      }, 100);
-
-      return () => clearTimeout(timer);
+      if (mounted.current) {
+        // Initialize database first
+        initializeApp();
+        
+        // Set today's date
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+        
+        // Mark as ready after a short delay to ensure component is mounted
+        const timer = setTimeout(() => {
+          if (mounted.current) {
+            setIsReady(true);
+          }
+        }, 100);
+      }
     }, 0);
+    
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   useEffect(() => {

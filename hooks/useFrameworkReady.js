@@ -1,7 +1,5 @@
 import { useEffect } from 'react';
-import Constants from 'expo-constants';
-
-const Platform = Constants.platform;
+import { Platform } from 'react-native';
 
 export function useFrameworkReady() {
   useEffect(() => {

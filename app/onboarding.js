@@ -18,11 +18,10 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { useAppStore } from '@/stores/useAppStore';
 import { StorageUtils } from '@/utils/StorageUtils';
 
-const Platform = Constants.platform;
 const TOTAL_STEPS = 15;
 
 const GOAL_OPTIONS = [

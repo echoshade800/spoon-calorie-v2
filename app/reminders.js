@@ -20,9 +20,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-const Platform = Constants.platform;
 
 // Configure notification handler
 Notifications.setNotificationHandler({
