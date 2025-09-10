@@ -537,7 +537,7 @@ export default function FoodDetailsScreen() {
           disabled={isLoading}
         >
           <Text style={[styles.bottomAddButtonText, isLoading && styles.bottomAddButtonTextDisabled]}>
-            {isLoading ? 'Adding...' : `Add to ${getMealDisplayName(selectedMeal)}`}
+            {isLoading ? 'Adding...' : 'Save'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -545,6 +545,41 @@ export default function FoodDetailsScreen() {
       {renderServingSelector()}
       {renderQuantitySelector()}
       {renderMealSelectorModal()}
+      
+      {/* Barcode Match Info */}
+      {params.barcodeMatched === 'true' && (
+        <View style={styles.barcodeMatchInfo}>
+          <Text style={styles.barcodeMatchText}>
+            This barcode was matched to: "{params.matchedFoodName || food.name}"
+          </Text>
+          <TouchableOpacity 
+            style={styles.findBetterMatchButton}
+            onPress={() => {
+              // Open search within this screen
+              Alert.alert(
+                'Find Better Match',
+                'Search for a different food for this barcode?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Search', 
+                    onPress: () => router.push({
+                      pathname: '/barcode/results',
+                      params: {
+                        barcode: params.barcode,
+                        meal: selectedMeal,
+                        showSearch: 'true'
+                      }
+                    })
+                  },
+                ]
+              );
+            }}
+          >
+            <Text style={styles.findBetterMatchText}>Find a better match</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -600,6 +635,25 @@ const styles = StyleSheet.create({
   foodSubtitle: {
     fontSize: 14,
     color: '#8E8E93',
+  },
+  barcodeMatchInfo: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+  },
+  barcodeMatchText: {
+    fontSize: 14,
+    color: '#1976D2',
+    marginBottom: 8,
+  },
+  findBetterMatchButton: {
+    alignSelf: 'flex-start',
+  },
+  findBetterMatchText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
   },
   fieldLabel: {
     fontSize: 16,

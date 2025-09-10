@@ -608,6 +608,14 @@ export default function AddScreen() {
           <Ionicons name="camera" size={20} color="#4CAF50" />
           <Text style={styles.quickActionText}>Scan Meal</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.quickActionButton}
+          onPress={() => router.push(`/barcode?meal=${selectedMeal}`)}
+        >
+          <Ionicons name="scan-outline" size={20} color="#4CAF50" />
+          <Text style={styles.quickActionText}>Barcode Scan</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab Content */}
@@ -686,7 +694,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 20,
     marginBottom: 16,
-    gap: 12,
+    gap: 8,
   },
   quickActionButton: {
     flex: 1,
@@ -694,7 +702,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
-    paddingVertical: 32,
+    paddingVertical: 24,
     borderRadius: 12,
     gap: 8,
     shadowColor: '#000',
@@ -704,7 +712,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   quickActionText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
     color: '#4CAF50',
   },
