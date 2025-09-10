@@ -23,25 +23,19 @@ import { useAppStore } from '@/stores/useAppStore';
 
 const ACTIVITY_LEVELS = [
   { value: 'sedentary', label: 'Sedentary', description: 'Desk job, little exercise', factor: 1.40 },
-  { value: 'lightly_active', label: 'Lightly Active', description: 'Light exercise 1-3 days/week', factor: 1.60 },
-  { value: 'active', label: 'Active', description: 'Moderate exercise 3-5 days/week', factor: 1.80 },
-  { value: 'very_active', label: 'Very Active', description: 'Heavy exercise 6-7 days/week', factor: 2.00 },
+  { value: 'lightly_active', label: 'Lightly Active', description: 'On your feet good part of day', factor: 1.60 },
+  { value: 'active', label: 'Active', description: 'Some physical activity most of day', factor: 1.80 },
+  { value: 'very_active', label: 'Very Active', description: 'Heavy physical work most of day', factor: 2.00 },
 ];
 
 const WEEKLY_GOALS = [
-  { value: 'lose_2', label: 'Lose 2.0 lb/week', delta: -1000 },
-  { value: 'lose_1_5', label: 'Lose 1.5 lb/week', delta: -750 },
-  { value: 'lose_1', label: 'Lose 1.0 lb/week', delta: -500 },
-  { value: 'lose_0_5', label: 'Lose 0.5 lb/week', delta: -250 },
-  { value: 'maintain', label: 'Maintain', delta: 0 },
-  { value: 'gain_0_5', label: 'Gain 0.5 lb/week', delta: 250 },
-  { value: 'gain_1', label: 'Gain 1.0 lb/week', delta: 500 },
-];
-
-const MACRO_PRESETS = [
-  { name: 'Balanced', carbs: 50, protein: 20, fat: 30 },
-  { name: 'Lower Carb', carbs: 35, protein: 30, fat: 35 },
-  { name: 'Higher Protein', carbs: 40, protein: 30, fat: 30 },
+  { value: 'lose_2', label: 'Lose 2.0 lb per week', delta: -1000 },
+  { value: 'lose_1_5', label: 'Lose 1.5 lb per week', delta: -750 },
+  { value: 'lose_1', label: 'Lose 1.0 lb per week', delta: -500 },
+  { value: 'lose_0_5', label: 'Lose 0.5 lb per week', delta: -250 },
+  { value: 'maintain', label: 'Maintain weight', delta: 0 },
+  { value: 'gain_0_5', label: 'Gain 0.5 lb per week', delta: 250 },
+  { value: 'gain_1', label: 'Gain 1.0 lb per week', delta: 500 },
 ];
 
 export default function ProfileScreen() {
@@ -49,40 +43,19 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, updateProfile } = useAppStore();
   
-  // Form state - initialize from profile
-  const [formData, setFormData] = useState({
-    sex: profile?.sex || 'male',
-    dateOfBirth: profile?.dateOfBirth || '',
-    height_cm: profile?.height_cm || 170,
-    startingWeight_kg: profile?.startingWeight_kg || profile?.weight_kg || 70,
-    currentWeight_kg: profile?.weight_kg || 70,
-    goalWeight_kg: profile?.goal_weight_kg || 65,
-    activityLevel: profile?.activity_level || 'lightly_active',
-    weeklyGoal: getWeeklyGoalFromDelta(profile?.rate_kcal_per_day || -250),
-    carbPct: profile?.macro_c || 50,
-    proteinPct: profile?.macro_p || 20,
-    fatPct: profile?.macro_f || 30,
-  });
-  
   // UI state
   const [heightUnit, setHeightUnit] = useState('cm');
   const [weightUnit, setWeightUnit] = useState('kg');
-  const [editingMacros, setEditingMacros] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [macroMode, setMacroMode] = useState('percent'); // 'percent' or 'grams'
   const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved'
   const [saveTimeout, setSaveTimeout] = useState(null);
-
-  // Initialize date of birth from age if not set
-  useEffect(() => {
-    if (!formData.dateOfBirth && profile?.age) {
-      const currentYear = new Date().getFullYear();
-      const birthYear = currentYear - profile.age;
-      setFormData(prev => ({ 
-        ...prev, 
-        dateOfBirth: `${birthYear}-01-01` 
-      }));
-    }
-  }, [profile?.age]);
+  
+  // Modal states
+  const [editingField, setEditingField] = useState(null);
+  const [showMacroEditor, setShowMacroEditor] = useState(false);
+  
+  // Form data for editing
+  const [editFormData, setEditFormData] = useState({});
 
   // Auto-save with debounce
   useEffect(() => {
@@ -90,22 +63,19 @@ export default function ProfileScreen() {
       clearTimeout(saveTimeout);
     }
     
-    setSaveStatus('saving');
-    const timeout = setTimeout(() => {
-      handleAutoSave();
-    }, 500);
-    
-    setSaveTimeout(timeout);
-    
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [formData]);
-
-  function getWeeklyGoalFromDelta(delta) {
-    const goal = WEEKLY_GOALS.find(g => g.delta === delta);
-    return goal?.value || 'lose_0_5';
-  }
+    if (profile) {
+      setSaveStatus('saving');
+      const timeout = setTimeout(() => {
+        handleAutoSave();
+      }, 500);
+      
+      setSaveTimeout(timeout);
+      
+      return () => {
+        if (timeout) clearTimeout(timeout);
+      };
+    }
+  }, [profile]);
 
   const calculateAge = (dateOfBirth) => {
     if (!dateOfBirth) return 25;
@@ -120,27 +90,33 @@ export default function ProfileScreen() {
       age--;
     }
     
-    return Math.max(13, Math.min(100, age));
+    return Math.max(14, Math.min(100, age));
   };
 
   const calculateBMR = () => {
-    const W = formData.currentWeight_kg;
-    const H = formData.height_cm;
-    const A = calculateAge(formData.dateOfBirth);
-    const C = formData.sex === 'male' ? 5 : -161;
+    if (!profile?.weight_kg || !profile?.height_cm || !profile?.sex) return 0;
+    
+    const W = profile.weight_kg;
+    const H = profile.height_cm;
+    const A = calculateAge(profile.dateOfBirth);
+    const C = profile.sex === 'male' ? 5 : -161;
     
     return 10 * W + 6.25 * H - 5 * A + C;
   };
 
   const calculateTDEE = () => {
+    if (!profile?.activity_level) return 0;
+    
     const bmr = calculateBMR();
-    const activity = ACTIVITY_LEVELS.find(a => a.value === formData.activityLevel);
+    const activity = ACTIVITY_LEVELS.find(a => a.value === profile.activity_level);
     return bmr * (activity?.factor || 1.60);
   };
 
   const calculateDailyGoal = () => {
+    if (!profile?.weeklyGoal) return 0;
+    
     const tdee = calculateTDEE();
-    const weeklyGoal = WEEKLY_GOALS.find(g => g.value === formData.weeklyGoal);
+    const weeklyGoal = WEEKLY_GOALS.find(g => g.value === profile.weeklyGoal);
     const delta = weeklyGoal?.delta || 0;
     const goal = tdee + delta;
     
@@ -148,50 +124,24 @@ export default function ProfileScreen() {
     return Math.round(goal / 10) * 10;
   };
 
-  const calculateMacroGrams = (percentage, isCarb = false, isProtein = false) => {
+  const calculateMacroGrams = (percentage, macroType) => {
     const dailyCalories = calculateDailyGoal();
     const calories = dailyCalories * (percentage / 100);
     
-    if (isCarb || isProtein) {
+    if (macroType === 'carbs' || macroType === 'protein') {
       return Math.round(calories / 4);
-    } else {
+    } else if (macroType === 'fat') {
       return Math.round(calories / 9);
     }
-  };
-
-  const updateFormData = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    return 0;
   };
 
   const handleAutoSave = async () => {
     try {
-      const age = calculateAge(formData.dateOfBirth);
-      const bmr = Math.round(calculateBMR());
-      const tdee = Math.round(calculateTDEE());
-      const dailyGoal = calculateDailyGoal();
-      const weeklyGoalData = WEEKLY_GOALS.find(g => g.value === formData.weeklyGoal);
+      // Sync to backend if needed
+      const { syncUserData } = useAppStore.getState();
+      await syncUserData();
       
-      const updatedProfile = {
-        ...profile,
-        sex: formData.sex,
-        age: age,
-        dateOfBirth: formData.dateOfBirth,
-        height_cm: formData.height_cm,
-        weight_kg: formData.currentWeight_kg,
-        startingWeight_kg: formData.startingWeight_kg,
-        goal_weight_kg: formData.goalWeight_kg,
-        activity_level: formData.activityLevel,
-        rate_kcal_per_day: Math.abs(weeklyGoalData?.delta || 250),
-        goal_type: weeklyGoalData?.delta > 0 ? 'gain' : weeklyGoalData?.delta < 0 ? 'lose' : 'maintain',
-        calorie_goal: dailyGoal,
-        macro_c: formData.carbPct,
-        macro_p: formData.proteinPct,
-        macro_f: formData.fatPct,
-        bmr: bmr,
-        tdee: tdee,
-      };
-
-      updateProfile(updatedProfile);
       setSaveStatus('saved');
       
       // Clear saved status after 2 seconds
@@ -221,47 +171,189 @@ export default function ProfileScreen() {
     return Math.round(kg * 2.20462 * 10) / 10;
   };
 
-  const applyMacroPreset = (preset) => {
-    setFormData(prev => ({
-      ...prev,
-      carbPct: preset.carbs,
-      proteinPct: preset.protein,
-      fatPct: preset.fat,
-    }));
+  const showEditConfirmation = (field) => {
+    let title = 'Edit this field?';
+    let body = 'Changing this will update your calorie target. Continue?';
+    
+    if (field === 'weeklyGoal' || field === 'activityLevel') {
+      body = 'Updating this may change your calorie goal and reset any custom goals. Continue?';
+    }
+    
+    Alert.alert(
+      title,
+      body,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Continue', 
+          onPress: () => openFieldEditor(field)
+        },
+      ]
+    );
   };
 
-  const adjustMacro = (macro, delta) => {
-    const current = formData[macro];
-    const newValue = Math.max(0, Math.min(100, current + delta));
-    setFormData(prev => ({ ...prev, [macro]: newValue }));
+  const openFieldEditor = (field) => {
+    // Initialize edit form data based on field
+    let initialData = {};
+    
+    switch (field) {
+      case 'height':
+        initialData = {
+          height_cm: profile?.height_cm || 170,
+          heightUnit: 'cm'
+        };
+        break;
+      case 'sex':
+        initialData = { sex: profile?.sex || 'female' };
+        break;
+      case 'dateOfBirth':
+        initialData = { dateOfBirth: profile?.dateOfBirth || '' };
+        break;
+      case 'startingWeight':
+        initialData = { 
+          startingWeight_kg: profile?.startingWeight_kg || profile?.weight_kg || 70,
+          startingWeightDate: profile?.startingWeightDate || new Date().toISOString().split('T')[0],
+          updateCurrentWeight: false
+        };
+        break;
+      case 'currentWeight':
+        initialData = { weight_kg: profile?.weight_kg || 70 };
+        break;
+      case 'goalWeight':
+        initialData = { goal_weight_kg: profile?.goal_weight_kg || 65 };
+        break;
+      case 'weeklyGoal':
+        initialData = { weeklyGoal: profile?.weeklyGoal || 'lose_0_5' };
+        break;
+      case 'activityLevel':
+        initialData = { activity_level: profile?.activity_level || 'lightly_active' };
+        break;
+    }
+    
+    setEditFormData(initialData);
+    setEditingField(field);
   };
 
-  const balanceMacros = () => {
-    const total = formData.carbPct + formData.proteinPct + formData.fatPct;
-    if (total === 100) return;
+  const saveFieldEdit = () => {
+    if (!editingField) return;
     
-    const diff = 100 - total;
-    const adjustment = Math.round(diff / 3);
+    try {
+      // Calculate derived values
+      const age = editFormData.dateOfBirth ? calculateAge(editFormData.dateOfBirth) : profile?.age;
+      
+      // Update profile with new data
+      const updates = { ...editFormData };
+      
+      // Add derived fields
+      if (editFormData.dateOfBirth) {
+        updates.age = age;
+      }
+      
+      // Handle starting weight date update
+      if (editingField === 'startingWeight') {
+        if (editFormData.updateCurrentWeight) {
+          updates.weight_kg = editFormData.startingWeight_kg;
+        }
+      }
+      
+      // Recalculate BMR, TDEE, and daily goal
+      const newProfile = { ...profile, ...updates };
+      const W = newProfile.weight_kg || 70;
+      const H = newProfile.height_cm || 170;
+      const A = newProfile.age || age || 25;
+      const C = newProfile.sex === 'male' ? 5 : -161;
+      const AF = ACTIVITY_LEVELS.find(a => a.value === newProfile.activity_level)?.factor || 1.60;
+      const weeklyGoalData = WEEKLY_GOALS.find(g => g.value === newProfile.weeklyGoal);
+      const delta = weeklyGoalData?.delta || 0;
+      
+      const bmr = 10 * W + 6.25 * H - 5 * A + C;
+      const tdee = bmr * AF;
+      const dailyGoal = Math.round((tdee + delta) / 10) * 10;
+      
+      updates.bmr = Math.round(bmr);
+      updates.tdee = Math.round(tdee);
+      updates.calorie_goal = dailyGoal;
+      
+      // Update goal type based on weekly goal
+      if (delta > 0) {
+        updates.goal_type = 'gain';
+      } else if (delta < 0) {
+        updates.goal_type = 'lose';
+      } else {
+        updates.goal_type = 'maintain';
+      }
+      
+      updates.rate_kcal_per_day = Math.abs(delta);
+      
+      updateProfile(updates);
+      setEditingField(null);
+      
+      Alert.alert('Saved', 'Goals updated.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+    }
+  };
+
+  const getDisplayValue = (field) => {
+    if (!profile) return '--';
     
-    setFormData(prev => ({
-      ...prev,
-      carbPct: Math.max(0, prev.carbPct + adjustment),
-      proteinPct: Math.max(0, prev.proteinPct + adjustment),
-      fatPct: Math.max(0, prev.fatPct + (diff - adjustment * 2)),
-    }));
+    switch (field) {
+      case 'height':
+        if (heightUnit === 'cm') {
+          return `${profile.height_cm || '--'} cm`;
+        } else {
+          const { feet, inches } = convertHeightFromCm(profile.height_cm || 170);
+          return `${feet} ft ${inches} in`;
+        }
+      case 'sex':
+        return profile.sex === 'male' ? 'Male' : 'Female';
+      case 'dateOfBirth':
+        return profile.dateOfBirth || '--';
+      case 'startingWeight':
+        const startingWeight = profile.startingWeight_kg || profile.weight_kg || 0;
+        const startingDate = profile.startingWeightDate || '2025/01/01';
+        const weightDisplay = weightUnit === 'kg' ? 
+          `${startingWeight} kg` : 
+          `${convertWeightFromKg(startingWeight)} lb`;
+        return `${weightDisplay} on ${startingDate}`;
+      case 'currentWeight':
+        const currentWeight = profile.weight_kg || 0;
+        return weightUnit === 'kg' ? 
+          `${currentWeight} kg` : 
+          `${convertWeightFromKg(currentWeight)} lb`;
+      case 'goalWeight':
+        const goalWeight = profile.goal_weight_kg || 0;
+        return weightUnit === 'kg' ? 
+          `${goalWeight} kg` : 
+          `${convertWeightFromKg(goalWeight)} lb`;
+      case 'weeklyGoal':
+        const weeklyGoal = WEEKLY_GOALS.find(g => g.value === profile.weeklyGoal);
+        return weeklyGoal?.label || '--';
+      case 'activityLevel':
+        const activity = ACTIVITY_LEVELS.find(a => a.value === profile.activity_level);
+        return activity?.label || '--';
+      default:
+        return '--';
+    }
+  };
+
+  const isProfileComplete = () => {
+    return profile?.sex && profile?.dateOfBirth && profile?.height_cm && 
+           profile?.weight_kg && profile?.activity_level && profile?.weeklyGoal;
   };
 
   const renderProfileHeader = () => {
-    const age = calculateAge(formData.dateOfBirth);
+    const age = profile?.age || calculateAge(profile?.dateOfBirth);
     const heightDisplay = heightUnit === 'cm' ? 
-      `${formData.height_cm}cm` : 
+      `${profile?.height_cm || '--'}cm` : 
       (() => {
-        const { feet, inches } = convertHeightFromCm(formData.height_cm);
+        if (!profile?.height_cm) return '--';
+        const { feet, inches } = convertHeightFromCm(profile.height_cm);
         return `${feet}'${inches}"`;
       })();
     const weightDisplay = weightUnit === 'kg' ? 
-      `${formData.currentWeight_kg}kg` : 
-      `${convertWeightFromKg(formData.currentWeight_kg)}lb`;
+      `${profile?.weight_kg || '--'}kg` : 
+      `${profile?.weight_kg ? convertWeightFromKg(profile.weight_kg) : '--'}lb`;
 
     return (
       <View style={styles.profileHeader}>
@@ -269,9 +361,8 @@ export default function ProfileScreen() {
           <Text style={styles.profileTitle}>Your Profile</Text>
           <View style={styles.profileSummary}>
             <Text style={styles.profileSummaryText}>
-              {formData.sex === 'male' ? 'Male' : 'Female'} • {age} years • {heightDisplay} • {weightDisplay}
+              {profile?.sex === 'male' ? 'Male' : 'Female'} • {age} years • {heightDisplay} • {weightDisplay}
             </Text>
-            <Ionicons name="create-outline" size={16} color="#2EAD4A" />
           </View>
         </View>
         
@@ -293,24 +384,33 @@ export default function ProfileScreen() {
   };
 
   const renderDailyGoalsCard = () => {
-    const dailyCalories = calculateDailyGoal();
+    const dailyCalories = isProfileComplete() ? calculateDailyGoal() : 0;
     
     return (
       <View style={styles.dailyGoalsCard}>
         <Text style={styles.cardTitle}>Daily Goals</Text>
         <View style={styles.caloriesDisplay}>
-          <Text style={styles.caloriesNumber}>{dailyCalories.toLocaleString()}</Text>
+          <Text style={styles.caloriesNumber}>
+            {dailyCalories > 0 ? dailyCalories.toLocaleString() : '--'}
+          </Text>
           <Text style={styles.caloriesLabel}>Daily Calories</Text>
         </View>
+        <Text style={styles.caloriesSubtext}>
+          {isProfileComplete() ? 'Auto-calculated from your info' : 'Complete your info to see your daily goal'}
+        </Text>
       </View>
     );
   };
 
   const renderMacroTargetsCard = () => {
-    const dailyCalories = calculateDailyGoal();
-    const carbGrams = calculateMacroGrams(formData.carbPct, true);
-    const proteinGrams = calculateMacroGrams(formData.proteinPct, false, true);
-    const fatGrams = calculateMacroGrams(formData.fatPct);
+    const dailyCalories = isProfileComplete() ? calculateDailyGoal() : 0;
+    const carbPct = profile?.macro_c || 45;
+    const proteinPct = profile?.macro_p || 25;
+    const fatPct = profile?.macro_f || 30;
+    
+    const carbGrams = dailyCalories > 0 ? calculateMacroGrams(carbPct, 'carbs') : 0;
+    const proteinGrams = dailyCalories > 0 ? calculateMacroGrams(proteinPct, 'protein') : 0;
+    const fatGrams = dailyCalories > 0 ? calculateMacroGrams(fatPct, 'fat') : 0;
     
     return (
       <View style={styles.macroTargetsContainer}>
@@ -318,27 +418,27 @@ export default function ProfileScreen() {
         <View style={styles.macroCards}>
           <TouchableOpacity 
             style={styles.macroCard}
-            onPress={() => setEditingMacros(true)}
+            onPress={() => setShowMacroEditor(true)}
           >
-            <Text style={styles.macroPercentage}>{formData.carbPct}%</Text>
+            <Text style={styles.macroPercentage}>{carbPct}%</Text>
             <Text style={styles.macroGrams}>{carbGrams}g</Text>
             <Text style={styles.macroLabel}>Carbs</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.macroCard}
-            onPress={() => setEditingMacros(true)}
+            onPress={() => setShowMacroEditor(true)}
           >
-            <Text style={styles.macroPercentage}>{formData.proteinPct}%</Text>
+            <Text style={styles.macroPercentage}>{proteinPct}%</Text>
             <Text style={styles.macroGrams}>{proteinGrams}g</Text>
             <Text style={styles.macroLabel}>Protein</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.macroCard}
-            onPress={() => setEditingMacros(true)}
+            onPress={() => setShowMacroEditor(true)}
           >
-            <Text style={styles.macroPercentage}>{formData.fatPct}%</Text>
+            <Text style={styles.macroPercentage}>{fatPct}%</Text>
             <Text style={styles.macroGrams}>{fatGrams}g</Text>
             <Text style={styles.macroLabel}>Fat</Text>
           </TouchableOpacity>
@@ -347,52 +447,608 @@ export default function ProfileScreen() {
     );
   };
 
-  const renderMacroEditModal = () => {
-    const totalPct = formData.carbPct + formData.proteinPct + formData.fatPct;
+  const renderInfoRow = (label, field, value) => (
+    <TouchableOpacity 
+      key={field}
+      style={styles.infoRow}
+      onPress={() => showEditConfirmation(field)}
+    >
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderFieldEditor = () => {
+    if (!editingField) return null;
+
+    switch (editingField) {
+      case 'height':
+        return renderHeightEditor();
+      case 'sex':
+        return renderSexEditor();
+      case 'dateOfBirth':
+        return renderDateEditor();
+      case 'startingWeight':
+        return renderStartingWeightEditor();
+      case 'currentWeight':
+        return renderCurrentWeightEditor();
+      case 'goalWeight':
+        return renderGoalWeightEditor();
+      case 'weeklyGoal':
+        return renderWeeklyGoalEditor();
+      case 'activityLevel':
+        return renderActivityLevelEditor();
+      default:
+        return null;
+    }
+  };
+
+  const renderHeightEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Height</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editorContent}>
+            {/* Unit Toggle */}
+            <View style={styles.unitToggleContainer}>
+              <View style={styles.unitToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    (editFormData.heightUnit || 'cm') === 'cm' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setEditFormData(prev => ({ ...prev, heightUnit: 'cm' }))}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    (editFormData.heightUnit || 'cm') === 'cm' && styles.selectedUnitButtonText
+                  ]}>
+                    cm
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitButton,
+                    editFormData.heightUnit === 'ft' && styles.selectedUnitButton
+                  ]}
+                  onPress={() => setEditFormData(prev => ({ ...prev, heightUnit: 'ft' }))}
+                >
+                  <Text style={[
+                    styles.unitButtonText,
+                    editFormData.heightUnit === 'ft' && styles.selectedUnitButtonText
+                  ]}>
+                    ft/in
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            {/* Height Input */}
+            {(editFormData.heightUnit || 'cm') === 'cm' ? (
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.numberInput}
+                  value={editFormData.height_cm?.toString() || ''}
+                  onChangeText={(text) => {
+                    const value = parseFloat(text) || 0;
+                    setEditFormData(prev => ({ 
+                      ...prev, 
+                      height_cm: Math.max(120, Math.min(230, value))
+                    }));
+                  }}
+                  keyboardType="numeric"
+                  placeholder="170"
+                  autoFocus
+                />
+                <Text style={styles.inputUnit}>cm</Text>
+              </View>
+            ) : (
+              <View style={styles.heightFtInContainer}>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={convertHeightFromCm(editFormData.height_cm || 170).feet.toString()}
+                    onChangeText={(text) => {
+                      const feet = parseInt(text) || 0;
+                      const { inches } = convertHeightFromCm(editFormData.height_cm || 170);
+                      const newCm = convertHeightToCm(feet, inches);
+                      setEditFormData(prev => ({ 
+                        ...prev, 
+                        height_cm: Math.max(120, Math.min(230, newCm))
+                      }));
+                    }}
+                    keyboardType="numeric"
+                    placeholder="5"
+                  />
+                  <Text style={styles.inputUnit}>ft</Text>
+                </View>
+                
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={convertHeightFromCm(editFormData.height_cm || 170).inches.toString()}
+                    onChangeText={(text) => {
+                      const inches = parseInt(text) || 0;
+                      const { feet } = convertHeightFromCm(editFormData.height_cm || 170);
+                      const newCm = convertHeightToCm(feet, inches);
+                      setEditFormData(prev => ({ 
+                        ...prev, 
+                        height_cm: Math.max(120, Math.min(230, newCm))
+                      }));
+                    }}
+                    keyboardType="numeric"
+                    placeholder="8"
+                  />
+                  <Text style={styles.inputUnit}>in</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderSexEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Sex at Birth</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editorContent}>
+            <View style={styles.radioGroup}>
+              {[
+                { value: 'female', label: 'Female' },
+                { value: 'male', label: 'Male' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.radioOption,
+                    editFormData.sex === option.value && styles.selectedRadioOption
+                  ]}
+                  onPress={() => setEditFormData(prev => ({ ...prev, sex: option.value }))}
+                >
+                  <Text style={[
+                    styles.radioLabel,
+                    editFormData.sex === option.value && styles.selectedRadioLabel
+                  ]}>
+                    {option.label}
+                  </Text>
+                  <View style={[
+                    styles.radioButton,
+                    editFormData.sex === option.value && styles.selectedRadioButton
+                  ]}>
+                    {editFormData.sex === option.value && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderDateEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Date of Birth</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editorContent}>
+            <TextInput
+              style={styles.dateInput}
+              value={editFormData.dateOfBirth || ''}
+              onChangeText={(text) => setEditFormData(prev => ({ ...prev, dateOfBirth: text }))}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#999"
+              autoFocus
+            />
+            <Text style={styles.dateHint}>
+              Age: {calculateAge(editFormData.dateOfBirth)} years
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderStartingWeightEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Starting Weight</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editorContent}>
+            {/* Weight Input */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.numberInput}
+                value={weightUnit === 'kg' ? 
+                  (editFormData.startingWeight_kg?.toString() || '') : 
+                  (editFormData.startingWeight_kg ? convertWeightFromKg(editFormData.startingWeight_kg).toString() : '')
+                }
+                onChangeText={(text) => {
+                  const value = parseFloat(text) || 0;
+                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
+                  setEditFormData(prev => ({ 
+                    ...prev, 
+                    startingWeight_kg: Math.max(30, Math.min(300, kgValue))
+                  }));
+                }}
+                keyboardType="numeric"
+                placeholder={weightUnit === 'kg' ? "70" : "154"}
+                autoFocus
+              />
+              <Text style={styles.inputUnit}>{weightUnit}</Text>
+            </View>
+            
+            {/* Date Input */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.dateInput}
+                value={editFormData.startingWeightDate || ''}
+                onChangeText={(text) => setEditFormData(prev => ({ ...prev, startingWeightDate: text }))}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#999"
+              />
+            </View>
+            
+            {/* Update Current Weight Option */}
+            <TouchableOpacity 
+              style={styles.checkboxRow}
+              onPress={() => setEditFormData(prev => ({ 
+                ...prev, 
+                updateCurrentWeight: !prev.updateCurrentWeight 
+              }))}
+            >
+              <View style={[
+                styles.checkbox,
+                editFormData.updateCurrentWeight && styles.selectedCheckbox
+              ]}>
+                {editFormData.updateCurrentWeight && (
+                  <Ionicons name="checkmark" size={16} color="#fff" />
+                )}
+              </View>
+              <Text style={styles.checkboxLabel}>Update Current Weight to match</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderCurrentWeightEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Current Weight</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editorContent}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.numberInput}
+                value={weightUnit === 'kg' ? 
+                  (editFormData.weight_kg?.toString() || '') : 
+                  (editFormData.weight_kg ? convertWeightFromKg(editFormData.weight_kg).toString() : '')
+                }
+                onChangeText={(text) => {
+                  const value = parseFloat(text) || 0;
+                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
+                  setEditFormData(prev => ({ 
+                    ...prev, 
+                    weight_kg: Math.max(30, Math.min(300, kgValue))
+                  }));
+                }}
+                keyboardType="numeric"
+                placeholder={weightUnit === 'kg' ? "70" : "154"}
+                autoFocus
+              />
+              <Text style={styles.inputUnit}>{weightUnit}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderGoalWeightEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Goal Weight</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editorContent}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.numberInput}
+                value={weightUnit === 'kg' ? 
+                  (editFormData.goal_weight_kg?.toString() || '') : 
+                  (editFormData.goal_weight_kg ? convertWeightFromKg(editFormData.goal_weight_kg).toString() : '')
+                }
+                onChangeText={(text) => {
+                  const value = parseFloat(text) || 0;
+                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
+                  setEditFormData(prev => ({ 
+                    ...prev, 
+                    goal_weight_kg: Math.max(30, Math.min(300, kgValue))
+                  }));
+                }}
+                keyboardType="numeric"
+                placeholder={weightUnit === 'kg' ? "65" : "143"}
+                autoFocus
+              />
+              <Text style={styles.inputUnit}>{weightUnit}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderWeeklyGoalEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Weekly Goal</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.editorContent}>
+            <View style={styles.radioGroup}>
+              {WEEKLY_GOALS.map((goal) => (
+                <TouchableOpacity
+                  key={goal.value}
+                  style={[
+                    styles.radioOption,
+                    editFormData.weeklyGoal === goal.value && styles.selectedRadioOption
+                  ]}
+                  onPress={() => setEditFormData(prev => ({ ...prev, weeklyGoal: goal.value }))}
+                >
+                  <View style={styles.radioContent}>
+                    <Text style={[
+                      styles.radioLabel,
+                      editFormData.weeklyGoal === goal.value && styles.selectedRadioLabel
+                    ]}>
+                      {goal.label}
+                    </Text>
+                    <Text style={styles.radioDescription}>
+                      {goal.delta > 0 ? '+' : ''}{goal.delta} kcal/day
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.radioButton,
+                    editFormData.weeklyGoal === goal.value && styles.selectedRadioButton
+                  ]}>
+                    {editFormData.weeklyGoal === goal.value && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderActivityLevelEditor = () => (
+    <Modal visible={true} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.editorModal}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={() => setEditingField(null)}>
+              <Text style={styles.editorCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editorTitle}>Activity Level</Text>
+            <TouchableOpacity onPress={saveFieldEdit}>
+              <Text style={styles.editorSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.editorContent}>
+            <View style={styles.radioGroup}>
+              {ACTIVITY_LEVELS.map((activity) => (
+                <TouchableOpacity
+                  key={activity.value}
+                  style={[
+                    styles.radioOption,
+                    editFormData.activity_level === activity.value && styles.selectedRadioOption
+                  ]}
+                  onPress={() => setEditFormData(prev => ({ ...prev, activity_level: activity.value }))}
+                >
+                  <View style={styles.radioContent}>
+                    <Text style={[
+                      styles.radioLabel,
+                      editFormData.activity_level === activity.value && styles.selectedRadioLabel
+                    ]}>
+                      {activity.label}
+                    </Text>
+                    <Text style={styles.radioDescription}>
+                      {activity.description} (AF {activity.factor})
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.radioButton,
+                    editFormData.activity_level === activity.value && styles.selectedRadioButton
+                  ]}>
+                    {editFormData.activity_level === activity.value && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderMacroEditor = () => {
+    const [tempMacros, setTempMacros] = useState({
+      carbPct: profile?.macro_c || 45,
+      proteinPct: profile?.macro_p || 25,
+      fatPct: profile?.macro_f || 30,
+    });
+    
+    const dailyCalories = calculateDailyGoal();
+    const totalPct = tempMacros.carbPct + tempMacros.proteinPct + tempMacros.fatPct;
     const remainingPct = 100 - totalPct;
     
+    const adjustMacro = (macro, delta) => {
+      const current = tempMacros[macro];
+      const newValue = Math.max(0, Math.min(100, current + delta));
+      setTempMacros(prev => ({ ...prev, [macro]: newValue }));
+    };
+    
+    const resetToDefault = () => {
+      setTempMacros({ carbPct: 45, proteinPct: 25, fatPct: 30 });
+    };
+    
+    const balanceMacros = () => {
+      if (totalPct === 100) return;
+      
+      const diff = 100 - totalPct;
+      const adjustment = Math.round(diff / 3);
+      
+      setTempMacros(prev => ({
+        carbPct: Math.max(0, Math.min(100, prev.carbPct + adjustment)),
+        proteinPct: Math.max(0, Math.min(100, prev.proteinPct + adjustment)),
+        fatPct: Math.max(0, Math.min(100, prev.fatPct + (diff - adjustment * 2))),
+      }));
+    };
+    
+    const saveMacros = () => {
+      if (totalPct !== 100) {
+        Alert.alert('Invalid Macros', 'Macro percentages must total 100%');
+        return;
+      }
+      
+      updateProfile({
+        macro_c: tempMacros.carbPct,
+        macro_p: tempMacros.proteinPct,
+        macro_f: tempMacros.fatPct,
+      });
+      
+      setShowMacroEditor(false);
+      Alert.alert('Saved', 'Goals updated.');
+    };
+    
     return (
-      <Modal visible={editingMacros} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showMacroEditor} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.macroEditContainer}>
           <StatusBar barStyle="dark-content" backgroundColor="#fff" />
           
           {/* Header */}
           <View style={[styles.macroEditHeader, { paddingTop: insets.top + 16 }]}>
-            <TouchableOpacity onPress={() => setEditingMacros(false)}>
+            <TouchableOpacity onPress={() => setShowMacroEditor(false)}>
               <Text style={styles.macroEditCancel}>Cancel</Text>
             </TouchableOpacity>
             
-            <Text style={styles.macroEditTitle}>Edit Macro Targets</Text>
+            <Text style={styles.macroEditTitle}>Macro Targets</Text>
             
-            <TouchableOpacity onPress={() => setEditingMacros(false)}>
-              <Text style={styles.macroEditDone}>Done</Text>
+            <TouchableOpacity onPress={saveMacros}>
+              <Text style={styles.macroEditSave}>Save</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.macroEditContent}>
-            {/* Quick Presets */}
-            <View style={styles.presetsSection}>
-              <Text style={styles.presetsTitle}>Quick Presets</Text>
-              <View style={styles.presetButtons}>
-                {MACRO_PRESETS.map((preset) => (
-                  <TouchableOpacity
-                    key={preset.name}
-                    style={styles.presetButton}
-                    onPress={() => applyMacroPreset(preset)}
-                  >
-                    <Text style={styles.presetButtonText}>{preset.name}</Text>
-                    <Text style={styles.presetButtonSubtext}>
-                      {preset.carbs}% • {preset.protein}% • {preset.fat}%
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            {/* Mode Toggle */}
+            <View style={styles.macroModeSection}>
+              <View style={styles.macroModeToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.macroModeButton,
+                    macroMode === 'percent' && styles.activeMacroModeButton
+                  ]}
+                  onPress={() => setMacroMode('percent')}
+                >
+                  <Text style={[
+                    styles.macroModeText,
+                    macroMode === 'percent' && styles.activeMacroModeText
+                  ]}>
+                    Percent
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.macroModeButton,
+                    macroMode === 'grams' && styles.activeMacroModeButton
+                  ]}
+                  onPress={() => setMacroMode('grams')}
+                >
+                  <Text style={[
+                    styles.macroModeText,
+                    macroMode === 'grams' && styles.activeMacroModeText
+                  ]}>
+                    Grams
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
             {/* Macro Controls */}
             <View style={styles.macroControlsSection}>
-              <Text style={styles.macroControlsTitle}>Custom Percentages</Text>
-              
               {/* Carbs */}
               <View style={styles.macroControlRow}>
                 <Text style={styles.macroControlLabel}>Carbs</Text>
@@ -405,9 +1061,11 @@ export default function ProfileScreen() {
                   </TouchableOpacity>
                   
                   <View style={styles.macroValueDisplay}>
-                    <Text style={styles.macroControlValue}>{formData.carbPct}%</Text>
-                    <Text style={styles.macroControlGrams}>
-                      {calculateMacroGrams(formData.carbPct, true)}g
+                    <Text style={styles.macroControlValue}>
+                      {macroMode === 'percent' ? 
+                        `${tempMacros.carbPct}%` : 
+                        `${calculateMacroGrams(tempMacros.carbPct, 'carbs')}g`
+                      }
                     </Text>
                   </View>
                   
@@ -432,9 +1090,11 @@ export default function ProfileScreen() {
                   </TouchableOpacity>
                   
                   <View style={styles.macroValueDisplay}>
-                    <Text style={styles.macroControlValue}>{formData.proteinPct}%</Text>
-                    <Text style={styles.macroControlGrams}>
-                      {calculateMacroGrams(formData.proteinPct, false, true)}g
+                    <Text style={styles.macroControlValue}>
+                      {macroMode === 'percent' ? 
+                        `${tempMacros.proteinPct}%` : 
+                        `${calculateMacroGrams(tempMacros.proteinPct, 'protein')}g`
+                      }
                     </Text>
                   </View>
                   
@@ -459,9 +1119,11 @@ export default function ProfileScreen() {
                   </TouchableOpacity>
                   
                   <View style={styles.macroValueDisplay}>
-                    <Text style={styles.macroControlValue}>{formData.fatPct}%</Text>
-                    <Text style={styles.macroControlGrams}>
-                      {calculateMacroGrams(formData.fatPct)}g
+                    <Text style={styles.macroControlValue}>
+                      {macroMode === 'percent' ? 
+                        `${tempMacros.fatPct}%` : 
+                        `${calculateMacroGrams(tempMacros.fatPct, 'fat')}g`
+                      }
                     </Text>
                   </View>
                   
@@ -474,23 +1136,35 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Total Display */}
-              <View style={styles.macroTotalRow}>
-                <Text style={[
-                  styles.macroTotalText,
-                  totalPct !== 100 && styles.macroTotalError
-                ]}>
-                  Total: {totalPct}% {remainingPct !== 0 && `(${remainingPct > 0 ? '+' : ''}${remainingPct}%)`}
-                </Text>
+              {/* Total & Actions */}
+              <View style={styles.macroActionsRow}>
+                <View style={styles.macroTotalDisplay}>
+                  <Text style={[
+                    styles.macroTotalText,
+                    totalPct !== 100 && styles.macroTotalError
+                  ]}>
+                    Total: {totalPct}%
+                    {remainingPct !== 0 && ` (${remainingPct > 0 ? '+' : ''}${remainingPct}%)`}
+                  </Text>
+                </View>
                 
-                {totalPct !== 100 && (
+                <View style={styles.macroActionButtons}>
                   <TouchableOpacity 
-                    style={styles.balanceButton}
-                    onPress={balanceMacros}
+                    style={styles.resetButton}
+                    onPress={resetToDefault}
                   >
-                    <Text style={styles.balanceButtonText}>Balance</Text>
+                    <Text style={styles.resetButtonText}>Reset to default (45/25/30)</Text>
                   </TouchableOpacity>
-                )}
+                  
+                  {totalPct !== 100 && (
+                    <TouchableOpacity 
+                      style={styles.balanceButton}
+                      onPress={balanceMacros}
+                    >
+                      <Text style={styles.balanceButtonText}>Balance</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </View>
           </ScrollView>
@@ -498,37 +1172,6 @@ export default function ProfileScreen() {
       </Modal>
     );
   };
-
-  const renderDatePickerModal = () => (
-    <Modal visible={showDatePicker} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.datePickerModal}>
-          <View style={styles.datePickerHeader}>
-            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-              <Text style={styles.datePickerCancel}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.datePickerTitle}>Date of Birth</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-              <Text style={styles.datePickerDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.datePickerContent}>
-            <TextInput
-              style={styles.dateInput}
-              value={formData.dateOfBirth}
-              onChangeText={(text) => updateFormData('dateOfBirth', text)}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.dateHint}>
-              Age: {calculateAge(formData.dateOfBirth)} years
-            </Text>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
 
   if (!profile) {
     return (
@@ -558,398 +1201,29 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Sticky Top Cards */}
+        {/* Top Cards */}
         <View style={styles.topCards}>
           {renderDailyGoalsCard()}
           {renderMacroTargetsCard()}
         </View>
 
-        {/* Profile Details */}
-        <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>Profile Details</Text>
+        {/* Your Info Section */}
+        <View style={styles.infoSection}>
+          <Text style={styles.sectionTitle}>Your Info</Text>
           
-          {/* Sex */}
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Sex</Text>
-            <View style={styles.segmentedControl}>
-              <TouchableOpacity
-                style={[
-                  styles.segmentButton,
-                  formData.sex === 'male' && styles.selectedSegmentButton
-                ]}
-                onPress={() => updateFormData('sex', 'male')}
-              >
-                <Text style={[
-                  styles.segmentText,
-                  formData.sex === 'male' && styles.selectedSegmentText
-                ]}>
-                  Male
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.segmentButton,
-                  formData.sex === 'female' && styles.selectedSegmentButton
-                ]}
-                onPress={() => updateFormData('sex', 'female')}
-              >
-                <Text style={[
-                  styles.segmentText,
-                  formData.sex === 'female' && styles.selectedSegmentText
-                ]}>
-                  Female
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Date of Birth */}
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Date of Birth</Text>
-            <TouchableOpacity 
-              style={styles.fieldButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.fieldValue}>
-                {formData.dateOfBirth || 'Select date'}
-              </Text>
-              <Text style={styles.fieldSubvalue}>
-                Age: {calculateAge(formData.dateOfBirth)}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Height */}
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Height</Text>
-            <View style={styles.unitFieldContainer}>
-              <View style={styles.unitToggle}>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    heightUnit === 'cm' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setHeightUnit('cm')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    heightUnit === 'cm' && styles.selectedUnitButtonText
-                  ]}>
-                    cm
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    heightUnit === 'ft' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setHeightUnit('ft')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    heightUnit === 'ft' && styles.selectedUnitButtonText
-                  ]}>
-                    ft/in
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              {heightUnit === 'cm' ? (
-                <TextInput
-                  style={styles.unitInput}
-                  value={formData.height_cm.toString()}
-                  onChangeText={(text) => {
-                    const value = parseFloat(text) || 0;
-                    updateFormData('height_cm', Math.max(120, Math.min(230, value)));
-                  }}
-                  keyboardType="numeric"
-                  placeholder="170"
-                />
-              ) : (
-                <View style={styles.heightFtInContainer}>
-                  <TextInput
-                    style={styles.heightFtInput}
-                    value={convertHeightFromCm(formData.height_cm).feet.toString()}
-                    onChangeText={(text) => {
-                      const feet = parseInt(text) || 0;
-                      const { inches } = convertHeightFromCm(formData.height_cm);
-                      const newCm = convertHeightToCm(feet, inches);
-                      updateFormData('height_cm', Math.max(120, Math.min(230, newCm)));
-                    }}
-                    keyboardType="numeric"
-                    placeholder="5"
-                  />
-                  <Text style={styles.heightSeparator}>'</Text>
-                  <TextInput
-                    style={styles.heightInInput}
-                    value={convertHeightFromCm(formData.height_cm).inches.toString()}
-                    onChangeText={(text) => {
-                      const inches = parseInt(text) || 0;
-                      const { feet } = convertHeightFromCm(formData.height_cm);
-                      const newCm = convertHeightToCm(feet, inches);
-                      updateFormData('height_cm', Math.max(120, Math.min(230, newCm)));
-                    }}
-                    keyboardType="numeric"
-                    placeholder="8"
-                  />
-                  <Text style={styles.heightSeparator}>"</Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Starting Weight */}
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Starting Weight</Text>
-            <View style={styles.unitFieldContainer}>
-              <View style={styles.unitToggle}>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    weightUnit === 'kg' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setWeightUnit('kg')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    weightUnit === 'kg' && styles.selectedUnitButtonText
-                  ]}>
-                    kg
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    weightUnit === 'lb' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setWeightUnit('lb')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    weightUnit === 'lb' && styles.selectedUnitButtonText
-                  ]}>
-                    lb
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TextInput
-                style={styles.unitInput}
-                value={weightUnit === 'kg' ? 
-                  formData.startingWeight_kg.toString() : 
-                  convertWeightFromKg(formData.startingWeight_kg).toString()
-                }
-                onChangeText={(text) => {
-                  const value = parseFloat(text) || 0;
-                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
-                  updateFormData('startingWeight_kg', Math.max(30, Math.min(300, kgValue)));
-                }}
-                keyboardType="numeric"
-                placeholder={weightUnit === 'kg' ? "70" : "154"}
-              />
-            </View>
-          </View>
-
-          {/* Current Weight */}
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Current Weight</Text>
-            <View style={styles.unitFieldContainer}>
-              <View style={styles.unitToggle}>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    weightUnit === 'kg' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setWeightUnit('kg')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    weightUnit === 'kg' && styles.selectedUnitButtonText
-                  ]}>
-                    kg
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    weightUnit === 'lb' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setWeightUnit('lb')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    weightUnit === 'lb' && styles.selectedUnitButtonText
-                  ]}>
-                    lb
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TextInput
-                style={styles.unitInput}
-                value={weightUnit === 'kg' ? 
-                  formData.currentWeight_kg.toString() : 
-                  convertWeightFromKg(formData.currentWeight_kg).toString()
-                }
-                onChangeText={(text) => {
-                  const value = parseFloat(text) || 0;
-                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
-                  updateFormData('currentWeight_kg', Math.max(30, Math.min(300, kgValue)));
-                }}
-                keyboardType="numeric"
-                placeholder={weightUnit === 'kg' ? "70" : "154"}
-              />
-            </View>
-          </View>
-
-          {/* Goal Weight */}
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Goal Weight</Text>
-            <View style={styles.unitFieldContainer}>
-              <View style={styles.unitToggle}>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    weightUnit === 'kg' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setWeightUnit('kg')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    weightUnit === 'kg' && styles.selectedUnitButtonText
-                  ]}>
-                    kg
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.unitButton,
-                    weightUnit === 'lb' && styles.selectedUnitButton
-                  ]}
-                  onPress={() => setWeightUnit('lb')}
-                >
-                  <Text style={[
-                    styles.unitButtonText,
-                    weightUnit === 'lb' && styles.selectedUnitButtonText
-                  ]}>
-                    lb
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TextInput
-                style={styles.unitInput}
-                value={weightUnit === 'kg' ? 
-                  formData.goalWeight_kg.toString() : 
-                  convertWeightFromKg(formData.goalWeight_kg).toString()
-                }
-                onChangeText={(text) => {
-                  const value = parseFloat(text) || 0;
-                  const kgValue = weightUnit === 'kg' ? value : convertWeightToKg(value);
-                  updateFormData('goalWeight_kg', Math.max(30, Math.min(300, kgValue)));
-                }}
-                keyboardType="numeric"
-                placeholder={weightUnit === 'kg' ? "65" : "143"}
-              />
-            </View>
-          </View>
-
-          {/* Activity Level */}
-          <View style={styles.fieldColumn}>
-            <Text style={styles.fieldLabel}>Activity Level</Text>
-            <View style={styles.radioGroup}>
-              {ACTIVITY_LEVELS.map((activity) => (
-                <TouchableOpacity
-                  key={activity.value}
-                  style={[
-                    styles.radioOption,
-                    formData.activityLevel === activity.value && styles.selectedRadioOption
-                  ]}
-                  onPress={() => updateFormData('activityLevel', activity.value)}
-                >
-                  <View style={styles.radioContent}>
-                    <Text style={[
-                      styles.radioLabel,
-                      formData.activityLevel === activity.value && styles.selectedRadioLabel
-                    ]}>
-                      {activity.label}
-                    </Text>
-                    <Text style={styles.radioDescription}>
-                      {activity.description}
-                    </Text>
-                  </View>
-                  <View style={[
-                    styles.radioButton,
-                    formData.activityLevel === activity.value && styles.selectedRadioButton
-                  ]}>
-                    {formData.activityLevel === activity.value && (
-                      <View style={styles.radioButtonInner} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Weekly Goal */}
-          <View style={styles.fieldColumn}>
-            <Text style={styles.fieldLabel}>Weekly Goal</Text>
-            <View style={styles.radioGroup}>
-              {WEEKLY_GOALS.map((goal) => (
-                <TouchableOpacity
-                  key={goal.value}
-                  style={[
-                    styles.radioOption,
-                    formData.weeklyGoal === goal.value && styles.selectedRadioOption
-                  ]}
-                  onPress={() => updateFormData('weeklyGoal', goal.value)}
-                >
-                  <View style={styles.radioContent}>
-                    <Text style={[
-                      styles.radioLabel,
-                      formData.weeklyGoal === goal.value && styles.selectedRadioLabel
-                    ]}>
-                      {goal.label}
-                    </Text>
-                    <Text style={styles.radioDescription}>
-                      {goal.delta > 0 ? '+' : ''}{goal.delta} kcal/day
-                    </Text>
-                  </View>
-                  <View style={[
-                    styles.radioButton,
-                    formData.weeklyGoal === goal.value && styles.selectedRadioButton
-                  ]}>
-                    {formData.weeklyGoal === goal.value && (
-                      <View style={styles.radioButtonInner} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Notifications Section */}
-        <View style={styles.notificationsSection}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          
-          <TouchableOpacity 
-            style={styles.notificationItem}
-            onPress={() => router.push('/reminders')}
-          >
-            <View style={styles.notificationContent}>
-              <Text style={styles.notificationLabel}>Reminders & Notifications</Text>
-              <Text style={styles.notificationDescription}>
-                Meal reminders and notification settings
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
+          {renderInfoRow('Height', 'height', getDisplayValue('height'))}
+          {renderInfoRow('Sex at Birth', 'sex', getDisplayValue('sex'))}
+          {renderInfoRow('Date of Birth', 'dateOfBirth', getDisplayValue('dateOfBirth'))}
+          {renderInfoRow('Starting Weight', 'startingWeight', getDisplayValue('startingWeight'))}
+          {renderInfoRow('Current Weight', 'currentWeight', getDisplayValue('currentWeight'))}
+          {renderInfoRow('Goal Weight', 'goalWeight', getDisplayValue('goalWeight'))}
+          {renderInfoRow('Weekly Goal', 'weeklyGoal', getDisplayValue('weeklyGoal'))}
+          {renderInfoRow('Activity Level', 'activityLevel', getDisplayValue('activityLevel'))}
         </View>
       </ScrollView>
 
-      {renderMacroEditModal()}
-      {renderDatePickerModal()}
+      {renderFieldEditor()}
+      {renderMacroEditor()}
     </View>
   );
 }
@@ -966,6 +1240,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   profileInfo: {
     flex: 1,
@@ -989,7 +1266,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 8,
   },
   saveStatusText: {
     fontSize: 14,
@@ -1026,6 +1302,7 @@ const styles = StyleSheet.create({
   },
   caloriesDisplay: {
     alignItems: 'center',
+    marginBottom: 8,
   },
   caloriesNumber: {
     fontSize: 48,
@@ -1037,6 +1314,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#8E8E93',
     marginTop: 4,
+  },
+  caloriesSubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
+    textAlign: 'center',
   },
   macroTargetsContainer: {
     backgroundColor: '#fff',
@@ -1076,7 +1358,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
   },
-  detailsSection: {
+  infoSection: {
     backgroundColor: '#fff',
     marginTop: 20,
     paddingHorizontal: 20,
@@ -1088,42 +1370,92 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 20,
   },
-  fieldRow: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    minHeight: 44,
   },
-  fieldColumn: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: '500',
+  infoLabel: {
+    fontSize: 17,
+    fontWeight: '400',
     color: '#000',
     flex: 1,
   },
-  fieldButton: {
-    alignItems: 'flex-end',
-  },
-  fieldValue: {
-    fontSize: 16,
+  infoValue: {
+    fontSize: 17,
     color: '#2EAD4A',
     fontWeight: '500',
+    textAlign: 'right',
+    maxWidth: '60%',
   },
-  fieldSubvalue: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 2,
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
-  unitFieldContainer: {
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  setupButton: {
+    backgroundColor: '#2EAD4A',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  setupButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  editorModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  editorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  editorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  editorCancel: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  editorSave: {
+    fontSize: 16,
+    color: '#2EAD4A',
+    fontWeight: '600',
+  },
+  editorContent: {
+    padding: 20,
+  },
+  unitToggleContainer: {
+    marginBottom: 20,
   },
   unitToggle: {
     flexDirection: 'row',
@@ -1132,11 +1464,10 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   unitButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    minWidth: 44,
+    flex: 1,
+    paddingVertical: 8,
     alignItems: 'center',
+    borderRadius: 6,
   },
   selectedUnitButton: {
     backgroundColor: '#fff',
@@ -1150,79 +1481,75 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '600',
   },
-  unitInput: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F8F9FA',
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  numberInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
     color: '#000',
     textAlign: 'center',
-    minWidth: 80,
+  },
+  inputUnit: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 8,
   },
   heightFtInContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    gap: 12,
   },
-  heightFtInput: {
+  dateInput: {
     backgroundColor: '#F8F9FA',
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    padding: 12,
     fontSize: 16,
     color: '#000',
     textAlign: 'center',
-    width: 40,
+    marginBottom: 12,
   },
-  heightInInput: {
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    fontSize: 16,
-    color: '#000',
-    textAlign: 'center',
-    width: 40,
-  },
-  heightSeparator: {
-    fontSize: 16,
-    color: '#8E8E93',
-  },
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: '#E5E5EA',
-    borderRadius: 8,
-    padding: 2,
-  },
-  segmentButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  selectedSegmentButton: {
-    backgroundColor: '#fff',
-  },
-  segmentText: {
+  dateHint: {
     fontSize: 14,
-    fontWeight: '500',
     color: '#8E8E93',
+    textAlign: 'center',
   },
-  selectedSegmentText: {
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E5EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedCheckbox: {
+    backgroundColor: '#2EAD4A',
+    borderColor: '#2EAD4A',
+  },
+  checkboxLabel: {
+    fontSize: 16,
     color: '#000',
-    fontWeight: '600',
+    flex: 1,
   },
   radioGroup: {
-    gap: 8,
-    marginTop: 12,
+    gap: 12,
   },
   radioOption: {
     flexDirection: 'row',
@@ -1272,56 +1599,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#2EAD4A',
   },
-  notificationsSection: {
-    backgroundColor: '#fff',
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 4,
-  },
-  notificationDescription: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  setupButton: {
-    backgroundColor: '#2EAD4A',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  setupButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
   
-  // Macro Edit Modal
+  // Macro Editor
   macroEditContainer: {
     flex: 1,
     backgroundColor: '#F2F2F7',
@@ -1345,7 +1624,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
   },
-  macroEditDone: {
+  macroEditSave: {
     fontSize: 16,
     color: '#2EAD4A',
     fontWeight: '600',
@@ -1353,48 +1632,40 @@ const styles = StyleSheet.create({
   macroEditContent: {
     flex: 1,
   },
-  presetsSection: {
+  macroModeSection: {
     backgroundColor: '#fff',
     marginBottom: 8,
     paddingHorizontal: 20,
     paddingVertical: 20,
   },
-  presetsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 16,
+  macroModeToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 2,
   },
-  presetButtons: {
-    gap: 12,
+  macroModeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
   },
-  presetButton: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
+  activeMacroModeButton: {
+    backgroundColor: '#fff',
   },
-  presetButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#2EAD4A',
-    marginBottom: 4,
-  },
-  presetButtonSubtext: {
+  macroModeText: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#8E8E93',
+  },
+  activeMacroModeText: {
+    color: '#000',
+    fontWeight: '600',
   },
   macroControlsSection: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingVertical: 20,
-  },
-  macroControlsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 20,
   },
   macroControlRow: {
     flexDirection: 'row',
@@ -1403,7 +1674,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   macroControlLabel: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '500',
     color: '#000',
     width: 80,
@@ -1414,9 +1685,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   macroStepButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#F8F9FA',
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -1432,19 +1703,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
   },
-  macroControlGrams: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 2,
-  },
-  macroTotalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  macroActionsRow: {
     marginTop: 20,
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
+  },
+  macroTotalDisplay: {
+    alignItems: 'center',
+    marginBottom: 16,
   },
   macroTotalText: {
     fontSize: 16,
@@ -1454,72 +1721,31 @@ const styles = StyleSheet.create({
   macroTotalError: {
     color: '#FF3B30',
   },
+  macroActionButtons: {
+    gap: 12,
+  },
+  resetButton: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
   balanceButton: {
     backgroundColor: '#2EAD4A',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   balanceButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
-  },
-  
-  // Date Picker Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  datePickerModal: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 0,
-    width: '85%',
-    maxWidth: 400,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  datePickerCancel: {
-    fontSize: 16,
-    color: '#8E8E93',
-  },
-  datePickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  datePickerDone: {
-    fontSize: 16,
-    color: '#2EAD4A',
-    fontWeight: '600',
-  },
-  datePickerContent: {
-    padding: 20,
-  },
-  dateInput: {
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#000',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  dateHint: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
   },
 });
