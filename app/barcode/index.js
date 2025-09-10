@@ -22,8 +22,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 
-const Platform = Constants.platform;
-
 export default function BarcodeScanScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -59,7 +57,7 @@ export default function BarcodeScanScreen() {
     setIsScanning(true);
     
     // Haptic feedback
-    if (Platform.OS !== 'web') {
+    if (Constants.platform?.OS !== 'web') {
       Vibration.vibrate(100);
     }
     
