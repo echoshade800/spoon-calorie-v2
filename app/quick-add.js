@@ -14,16 +14,17 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   StatusBar,
   Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { useAppStore } from '@/stores/useAppStore';
 import { getMealDisplayName } from '@/utils/helpers';
 
+const Platform = Constants.platform;
 const MEAL_TYPES = [
   { value: 'breakfast', label: 'Breakfast' },
   { value: 'lunch', label: 'Lunch' },

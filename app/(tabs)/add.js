@@ -15,18 +15,19 @@ import {
   Alert,
   Modal,
   Image,
-  Platform,
   FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
+import Constants from 'expo-constants';
 import { useAppStore } from '@/stores/useAppStore';
 import { getMealDisplayName } from '@/utils/helpers';
 import { calculateNutrition } from '@/utils/database';
 import SwipeableRow from '@/components/SwipeableRow';
 
+const Platform = Constants.platform;
 const MEAL_TYPES = [
   { value: 'breakfast', label: 'Breakfast' },
   { value: 'lunch', label: 'Lunch' },

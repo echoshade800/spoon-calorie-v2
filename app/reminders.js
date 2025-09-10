@@ -15,12 +15,14 @@ import {
   Alert,
   StatusBar,
   Linking,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+
+const Platform = Constants.platform;
 
 // Configure notification handler
 Notifications.setNotificationHandler({

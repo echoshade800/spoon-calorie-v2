@@ -14,13 +14,15 @@ import {
   Modal,
   StatusBar,
   Platform,
-  TextInput,
   Vibration,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
+
+const Platform = Constants.platform;
 
 export default function BarcodeScanScreen() {
   const router = useRouter();

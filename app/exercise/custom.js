@@ -13,13 +13,15 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   StatusBar,
   Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
+
+const Platform = Constants.platform;
 
 const CATEGORIES = [
   { value: 'cardio', label: 'Cardio', defaultMet: 7.0 },

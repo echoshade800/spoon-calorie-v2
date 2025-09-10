@@ -5,10 +5,12 @@
  * Features: Permission handling, step counting, daily reset, error handling
  */
 import { useState, useEffect } from 'react';
-import { Platform, Alert, Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { Pedometer } from 'expo-sensors';
+import Constants from 'expo-constants';
 import { useAppStore } from '@/stores/useAppStore';
 
+const Platform = Constants.platform;
 // Constants for calorie calculation
 const MET_WALKING = 3.0; // MET value for moderate walking
 const STEPS_PER_HOUR_WALKING = 6000; // Approximate steps per hour for moderate walking

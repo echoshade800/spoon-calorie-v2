@@ -15,18 +15,21 @@ export default function IndexScreen() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Initialize database first
-    initializeApp();
-    
-    // Set today's date
-    setSelectedDate(new Date().toISOString().split('T')[0]);
-    
-    // Mark as ready after a short delay to ensure component is mounted
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 100);
+    // Defer state updates to next event loop cycle to ensure component is mounted
+    setTimeout(() => {
+      // Initialize database first
+      initializeApp();
+      
+      // Set today's date
+      setSelectedDate(new Date().toISOString().split('T')[0]);
+      
+      // Mark as ready after a short delay to ensure component is mounted
+      const timer = setTimeout(() => {
+        setIsReady(true);
+      }, 100);
 
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    }, 0);
   }, []);
 
   useEffect(() => {

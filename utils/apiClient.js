@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+const Platform = Constants.platform;
 
 // API 基础配置
 const API_BASE_URL = Platform.OS === 'web' 

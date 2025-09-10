@@ -13,12 +13,14 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   StatusBar,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
+
+const Platform = Constants.platform;
 
 const PLACEHOLDER_TEXT = `1. Spread peanut butter and jelly on bread.
 2. Put slices of bread together.
