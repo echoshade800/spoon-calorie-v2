@@ -216,7 +216,13 @@ export default function FoodDetailsScreen() {
         `Added ${numberOfServings} × ${selectedServing.label} ${food.name} to ${getMealDisplayName(selectedMeal)} · ${nutrition.kcal} kcal`,
         [
           { text: 'Undo', style: 'destructive', onPress: () => {/* TODO: Implement undo */} },
-          { text: 'OK', style: 'default', onPress: () => router.replace('/add') }
+          { text: 'OK', style: 'default', onPress: () => {
+            if (params.fromBarcode === 'true') {
+              router.replace('/(tabs)/diary');
+            } else {
+              router.replace('/(tabs)/add');
+            }
+          }}
         ]
       );
     } catch (error) {

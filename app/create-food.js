@@ -598,4 +598,29 @@ const styles = StyleSheet.create({
   saveButtonTextDisabled: {
     color: '#8E8E93',
   },
+  barcodeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 12,
+  },
+  barcodeText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  barcodeBadge: {
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  barcodeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
 });
