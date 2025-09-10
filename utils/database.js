@@ -9,10 +9,10 @@ import { API } from './apiClient';
  */
 export const initializeDatabase = async () => {
   try {
-    console.log('数据库初始化跳过 - 使用服务器端数据库，无需网络调用');
+    console.log('数据库初始化跳过 - 使用服务器端数据库');
     return true;
   } catch (error) {
-    console.warn('数据库初始化跳过:', error.message);
+    console.warn('数据库初始化跳过');
     return false;
   }
 };

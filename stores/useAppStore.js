@@ -44,16 +44,14 @@ export const useAppStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // 只加载本地用户数据，完全跳过网络调用
+      // 只加载本地用户数据，完全跳过网络和数据库调用
       await get().loadLocalUserData();
       
-      // 延迟加载网络数据，不在初始化时执行
-      console.log('应用初始化完成，网络数据将按需加载');
+      console.log('应用初始化完成，所有数据将按需加载');
       
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
       console.warn('应用初始化警告:', error.message);
-      // 即使有错误也标记为就绪，允许应用继续运行
       set({ isDatabaseReady: true, isLoading: false });
     }
   },
@@ -599,13 +597,6 @@ export const useAppStore = create((set, get) => ({
     try {
       console.log('Adding custom food:', food);
       
-      // Ensure database is ready
-      const state = get();
-      if (!state.isDatabaseReady) {
-        console.log('Database not ready, initializing...');
-        await get().initializeApp();
-      }
-      
       const newFood = await addCustomFoodToDB(food);
       console.log('Food saved to database:', newFood);
       
@@ -621,7 +612,6 @@ export const useAppStore = create((set, get) => ({
         error: error.message,
         stack: error.stack,
         foodData: food,
-        isDatabaseReady: get().isDatabaseReady
       });
       throw error;
     }
