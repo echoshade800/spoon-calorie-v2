@@ -60,9 +60,20 @@ export default function DiaryScreen() {
 
   // 数据加载
   React.useEffect(() => {
-    loadUserMeals();
-    loadTodaysDiaryEntries();
-    loadTodaysExerciseEntries();
+    // 延迟加载数据，避免启动时网络调用
+    const loadDataWithDelay = async () => {
+      try {
+        await loadUserMeals();
+        await loadTodaysDiaryEntries();
+        await loadTodaysExerciseEntries();
+      } catch (error) {
+        console.warn('延迟加载数据失败:', error.message);
+      }
+    };
+    
+    // 延迟1秒后加载数据
+    const timer = setTimeout(loadDataWithDelay, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   // 当选择的日期改变时，重新加载数据

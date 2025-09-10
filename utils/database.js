@@ -9,10 +9,10 @@ import { API } from './apiClient';
  */
 export const initializeDatabase = async () => {
   try {
-    console.log('数据库初始化跳过 - 使用服务器端数据库');
+    console.log('数据库初始化跳过 - 使用服务器端数据库，无需网络调用');
     return true;
   } catch (error) {
-    console.warn('数据库初始化跳过:', error);
+    console.warn('数据库初始化跳过:', error.message);
     return false;
   }
 };
@@ -25,7 +25,7 @@ export const searchFoods = async (query, limit = 20) => {
     const response = await API.searchFoods(query, limit);
     return response.foods || [];
   } catch (error) {
-    console.error('搜索食物错误:', error);
+    console.warn('搜索食物错误:', error.message);
     return [];
   }
 };

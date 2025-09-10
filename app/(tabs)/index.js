@@ -39,13 +39,20 @@ export default function HomeScreen() {
   const stepsData = useStepsData();
 
   useEffect(() => {
-    // 只在首次加载时检查，不要在每次 tab 切换时检查
-    // 确保加载用户餐食数据
-    loadUserMeals();
-    // 加载今天的日记条目
-    loadTodaysDiaryEntries();
-    // 加载今天的运动条目
-    loadTodaysExerciseEntries();
+    // 延迟加载数据，避免启动时网络调用
+    const loadDataWithDelay = async () => {
+      try {
+        await loadUserMeals();
+        await loadTodaysDiaryEntries();
+        await loadTodaysExerciseEntries();
+      } catch (error) {
+        console.warn('延迟加载数据失败:', error.message);
+      }
+    };
+    
+    // 延迟2秒后加载数据
+    const timer = setTimeout(loadDataWithDelay, 2000);
+    return () => clearTimeout(timer);
   }, []); // 空依赖数组，只在组件挂载时执行一次
 
   if (!isOnboarded || !profile) {

@@ -44,33 +44,15 @@ export const useAppStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // 只加载本地用户数据，不同步到服务器
+      // 只加载本地用户数据，完全跳过网络调用
       await get().loadLocalUserData();
       
-      // 尝试加载用户的餐食数据，失败时继续
-      try {
-        await get().loadUserMeals();
-      } catch (mealsError) {
-        console.warn('加载餐食数据失败:', mealsError);
-      }
-      
-      // 尝试加载今天的日记条目，失败时继续
-      try {
-        await get().loadTodaysDiaryEntries();
-      } catch (diaryError) {
-        console.warn('加载日记条目失败:', diaryError);
-      }
-      
-      // 尝试加载今天的运动条目，失败时继续
-      try {
-        await get().loadTodaysExerciseEntries();
-      } catch (exerciseError) {
-        console.warn('加载运动条目失败:', exerciseError);
-      }
+      // 延迟加载网络数据，不在初始化时执行
+      console.log('应用初始化完成，网络数据将按需加载');
       
       set({ isDatabaseReady: true, isLoading: false });
     } catch (error) {
-      console.warn('应用初始化警告:', error);
+      console.warn('应用初始化警告:', error.message);
       // 即使有错误也标记为就绪，允许应用继续运行
       set({ isDatabaseReady: true, isLoading: false });
     }
