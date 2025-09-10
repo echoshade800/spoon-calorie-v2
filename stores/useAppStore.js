@@ -44,13 +44,6 @@ export const useAppStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // 尝试初始化数据库连接，但不阻塞应用启动
-      try {
-        await initializeDatabase();
-      } catch (dbError) {
-        console.warn('数据库连接失败，使用离线模式:', dbError);
-      }
-      
       // 只加载本地用户数据，不同步到服务器
       await get().loadLocalUserData();
       

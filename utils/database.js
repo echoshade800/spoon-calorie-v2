@@ -9,13 +9,10 @@ import { API } from './apiClient';
  */
 export const initializeDatabase = async () => {
   try {
-    console.log('初始化数据库...');
-    // 跳过 API 连接测试，避免阻塞应用启动
-    console.log('数据库初始化完成（跳过连接测试）');
+    console.log('数据库初始化跳过 - 使用服务器端数据库');
     return true;
   } catch (error) {
-    console.warn('数据库初始化警告:', error);
-    // 不抛出错误，允许应用继续运行
+    console.warn('数据库初始化跳过:', error);
     return false;
   }
 };
