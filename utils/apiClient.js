@@ -9,7 +9,7 @@ const API_BASE_URL = Platform.OS === 'web'
 // 创建 axios 实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // 增加超时时间到30秒
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,7 +18,7 @@ const apiClient = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`API 请求: ${config.method?.toUpperCase()} ${config.url}`);
+    // console.log(`API 请求: ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
@@ -33,17 +33,22 @@ apiClient.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    console.error('API 响应错误:', error);
+    console.warn('API 响应错误:', error.message);
     
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error('无法连接到服务器，请检查网络连接');
+    if (error.code === 'ECONNREFUSED' || error.code === 'ECONNABORTED') {
+      throw new Error('无法连接到服务器，请检查后端服务是否运行');
+    }
+    
+    if (error.code === 'ENOTFOUND') {
+      throw new Error('服务器地址无法解析，请检查网络配置');
     }
     
     if (error.response) {
-      throw new Error(error.response.data?.error || '服务器错误');
+      const message = error.response.data?.error || `服务器错误 (${error.response.status})`;
+      throw new Error(message);
     }
     
-    throw new Error('网络错误，请重试');
+    throw new Error(`网络错误: ${error.message}`);
   }
 );
 
