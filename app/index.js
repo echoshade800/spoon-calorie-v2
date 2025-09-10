@@ -44,30 +44,15 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isReady || !isDatabaseReady) return;
 
-    // Add small delay to ensure state is properly set
-    const timer = setTimeout(() => {
-      // Navigate based on onboarding status
-      console.log('检查导航条件:', { 
-        isOnboarded, 
-        profile: !!profile,
-        profileData: profile ? {
-          sex: profile.sex,
-          age: profile.age,
-          calorie_goal: profile.calorie_goal
-        } : null
-      });
-      
-      if (isOnboarded && profile) {
-        console.log('导航到主应用');
-        router.replace('/(tabs)');
-      } else {
-        console.log('导航到新手引导');
-        router.replace('/onboarding');
-      }
-    }, 100);
+    // Navigate based on onboarding status and profile completeness
+    const hasCompleteProfile = profile && profile.calorie_goal && profile.bmr && profile.tdee;
     
-    return () => clearTimeout(timer);
-  }, [isOnboarded, isReady, isDatabaseReady, profile, router]);
+    if (isOnboarded && hasCompleteProfile) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/onboarding');
+    }
+  }, [isOnboarded, isReady, isDatabaseReady, profile]);
 
   // Loading state - in a real app might show splash screen
   return <View style={styles.container} />;

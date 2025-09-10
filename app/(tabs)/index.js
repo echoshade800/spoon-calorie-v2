@@ -39,19 +39,21 @@ export default function HomeScreen() {
   const stepsData = useStepsData();
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      if (profile?.uid) { // Only load if profile and uid are available
-      }
+    // 延迟加载数据，避免启动时网络调用
+    const loadDataWithDelay = async () => {
       try {
         await loadUserMeals();
         await loadTodaysDiaryEntries();
         await loadTodaysExerciseEntries();
       } catch (error) {
-        console.warn('加载数据失败:', error.message);
+        console.warn('延迟加载数据失败:', error.message);
       }
     };
-    loadInitialData();
-  }, [profile?.uid, selectedDate]); // Depend on profile.uid and selectedDate
+    
+    // 延迟2秒后加载数据
+    const timer = setTimeout(loadDataWithDelay, 2000);
+    return () => clearTimeout(timer);
+  }, []); // 空依赖数组，只在组件挂载时执行一次
 
   if (!isOnboarded || !profile) {
     return null;

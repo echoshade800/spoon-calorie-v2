@@ -72,124 +72,98 @@ export const useAppStore = create((set, get) => ({
         localUserData.uid = StorageUtils.generateUID();
         await StorageUtils.setUserData(localUserData);
       }
-
-      // Ensure all profile fields have default values if missing
-      const hydratedProfile = {
-        uid: localUserData.uid || StorageUtils.generateUID(),
-        sex: localUserData.sex || 'male', // Default sex
-        age: localUserData.age || 25, // Default age
-        height_cm: localUserData.height_cm || 170, // Default height
-        weight_kg: localUserData.weight_kg || 70, // Default weight
-        activity_level: localUserData.activity_level || 'moderately_active', // Default activity
-        goal_type: localUserData.goal_type || 'maintain', // Default goal type
-        rate_kcal_per_day: localUserData.rate_kcal_per_day || 0,
-        calorie_goal: localUserData.calorie_goal || 2000, // Default calorie goal
-        macro_c: localUserData.macro_c || 45,
-        macro_p: localUserData.macro_p || 25,
-        macro_f: localUserData.macro_f || 30,
-        bmr: localUserData.bmr || 1500, // Default BMR
-        tdee: localUserData.tdee || 2000, // Default TDEE
-        dateOfBirth: localUserData.dateOfBirth || get().calculateDefaultDateOfBirth(localUserData.age || 25),
-        startingWeight: localUserData.startingWeight || localUserData.weight_kg || 70,
-        goal_weight_kg: localUserData.goal_weight_kg || 65,
-        weeklyGoal: localUserData.weeklyGoal || -0.5,
-        startingWeightDate: localUserData.startingWeightDate || new Date().toISOString().split('T')[0],
-        goals: localUserData.goals || [],
-        barriers: localUserData.barriers || [],
-        healthyHabits: localUserData.healthyHabits || [],
-        mealPlanning: localUserData.mealPlanning || '',
-        mealPlanOptIn: localUserData.mealPlanOptIn || '',
-      };
-
-      // 检查本地数据是否完整
-      const isCompleteProfile = localUserData.sex && 
-                                localUserData.age && 
-                                localUserData.height_cm && 
-                                localUserData.weight_kg && 
-                                localUserData.calorie_goal && 
-                                localUserData.bmr && 
-                                localUserData.tdee;
-
-      console.log('用户数据完整性检查:', {
-        sex: !!localUserData.sex,
-        age: !!localUserData.age,
-        height_cm: !!localUserData.height_cm,
-        weight_kg: !!localUserData.weight_kg,
-        calorie_goal: !!localUserData.calorie_goal,
-        bmr: !!localUserData.bmr,
-        tdee: !!localUserData.tdee,
-        isComplete: isCompleteProfile
-      });
       
-      set({ profile: hydratedProfile, isOnboarded: isCompleteProfile });
-      console.log('本地用户数据加载完成，profile:', localUserData);
-      console.log('isOnboarded:', isCompleteProfile);
-      
-      // 如果数据完整，尝试后台同步到服务器
-      if (isCompleteProfile) {
-        setTimeout(async () => {
-          try {
-            await get().syncUserData();
-            console.log('后台同步到服务器成功');
-          } catch (error) {
-            console.log('后台同步失败，继续使用本地数据:', error.message);
-          }
-        }, 2000);
+      // 先尝试从服务器获取完整的用户数据
+      try {
+        console.log('尝试从服务器获取用户数据:', localUserData.uid);
+        const serverResponse = await API.getUser(localUserData.uid);
+        
+        if (serverResponse.success && serverResponse.user) {
+          console.log('从服务器获取到完整用户数据');
+          const serverUser = serverResponse.user;
+          
+          // 注释掉本地存储保存
+          // await StorageUtils.setUserData(serverUser);
+          
+          // 更新应用状态
+          set({ profile: serverUser, isOnboarded: true });
+          return;
+        }
+      } catch (serverError) {
+        console.log('服务器查询失败，使用本地数据:', serverError.message);
       }
+      
+      // 如果服务器没有数据，检查本地数据是否完整
+      const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
+
+      // 更新本地状态
+      set({ profile: localUserData, isOnboarded: isCompleteProfile });
+      console.log('本地用户数据加载完成，isOnboarded:', isCompleteProfile);
     } catch (error) {
       console.error('加载本地用户数据错误:', error);
       set({ isOnboarded: false });
     }
   },
   
-  // 计算默认出生日期的辅助函数
-  calculateDefaultDateOfBirth: (age) => {
-    if (!age) return null;
-    const today = new Date();
-    const birthYear = today.getFullYear() - age;
-    return `${birthYear}-07-01`; // 使用7月1日作为默认生日
-  },
-  
   // 用户数据同步
   syncUserData: async () => {
     try {
+      // 先尝试从本地存储获取 UID
+      const localUserData = await StorageUtils.getUserData();
       const { profile } = get();
       
-      if (!profile || !profile.uid) {
-        console.log('Profile 或 UID 不存在，跳过同步');
+      // 优先使用本地存储的 UID，其次使用 profile 的 UID
+      const userUid = localUserData?.uid || profile?.uid;
+      
+      if (!userUid || !profile) {
+        console.log('用户 UID 或 profile 不存在，跳过同步');
         return;
+      }
+      
+      // 确保有 UID
+      let finalUid = userUid;
+      if (!finalUid) {
+        finalUid = StorageUtils.generateUID();
+        const updatedProfile = { ...profile, uid: finalUid };
+        set({ profile: updatedProfile });
+        // 注释掉本地存储保存
+        // await StorageUtils.setUserData(updatedProfile);
       }
       
       // 检查是否为完整的用户数据（已完成 onboarding）
-      const isCompleteProfile = profile.sex && 
-                                profile.age && 
-                                profile.height_cm && 
-                                profile.weight_kg && 
-                                profile.calorie_goal && 
-                                profile.bmr && 
-                                profile.tdee;
+      const isCompleteProfile = profile.calorie_goal && profile.bmr && profile.tdee;
 
       if (!isCompleteProfile) {
         console.log('用户资料不完整，跳过服务器同步');
+        // 仍然更新本地状态
+        set({ isOnboarded: !!profile.calorie_goal });
         return;
       }
       
-      console.log('开始同步用户数据到服务器:', profile.uid);
+      // 使用包含正确 UID 的 profile 数据进行同步
+      const profileToSync = { ...profile, uid: finalUid };
       
       // 同步到服务器
-      const response = await API.syncUser(profile);
+      const response = await API.syncUser(profileToSync);
       
       if (response.success) {
         console.log('用户数据同步成功');
-        // 更新本地状态
-        set({ profile: response.user || profile, isOnboarded: true });
+        // 注释掉本地存储保存
+        // await StorageUtils.setUserData(response.user);
+        // 更新应用状态
+        set({ profile: response.user, isOnboarded: true });
       } else {
         console.log('服务器同步跳过:', response.message);
+        // 使用本地数据
+        set({ isOnboarded: true });
       }
     } catch (error) {
       console.error('用户数据同步错误:', error);
-      // 同步失败不影响应用使用
-      console.log('继续使用本地数据');
+      // 同步失败不影响应用使用，继续使用本地数据
+      const { profile } = get();
+      if (profile) {
+        set({ isOnboarded: !!profile.calorie_goal });
+      }
     }
   },
   
