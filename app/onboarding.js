@@ -318,6 +318,7 @@ export default function OnboardingScreen() {
 
   const handleComplete = async () => {
     try {
+      const { profile: currentProfileInStore } = useAppStore.getState(); // Get current profile from Zustand store
       const weight = parseFloat(formData.weight_kg);
       const height = parseFloat(formData.height_cm);
       const age = parseInt(formData.age);
@@ -337,7 +338,7 @@ export default function OnboardingScreen() {
 
       // Create complete profile
       const completeProfile = {
-        uid: StorageUtils.generateUID(),
+        uid: currentProfileInStore?.uid || StorageUtils.generateUID(), // Use existing UID or generate new one
         sex: formData.sex,
         age: age,
         dateOfBirth: calculateDateOfBirth(age), // 根据年龄计算出生日期

@@ -72,7 +72,35 @@ export const useAppStore = create((set, get) => ({
         localUserData.uid = StorageUtils.generateUID();
         await StorageUtils.setUserData(localUserData);
       }
-      
+
+      // Ensure all profile fields have default values if missing
+      const hydratedProfile = {
+        uid: localUserData.uid || StorageUtils.generateUID(),
+        sex: localUserData.sex || 'male', // Default sex
+        age: localUserData.age || 25, // Default age
+        height_cm: localUserData.height_cm || 170, // Default height
+        weight_kg: localUserData.weight_kg || 70, // Default weight
+        activity_level: localUserData.activity_level || 'moderately_active', // Default activity
+        goal_type: localUserData.goal_type || 'maintain', // Default goal type
+        rate_kcal_per_day: localUserData.rate_kcal_per_day || 0,
+        calorie_goal: localUserData.calorie_goal || 2000, // Default calorie goal
+        macro_c: localUserData.macro_c || 45,
+        macro_p: localUserData.macro_p || 25,
+        macro_f: localUserData.macro_f || 30,
+        bmr: localUserData.bmr || 1500, // Default BMR
+        tdee: localUserData.tdee || 2000, // Default TDEE
+        dateOfBirth: localUserData.dateOfBirth || get().calculateDefaultDateOfBirth(localUserData.age || 25),
+        startingWeight: localUserData.startingWeight || localUserData.weight_kg || 70,
+        goal_weight_kg: localUserData.goal_weight_kg || 65,
+        weeklyGoal: localUserData.weeklyGoal || -0.5,
+        startingWeightDate: localUserData.startingWeightDate || new Date().toISOString().split('T')[0],
+        goals: localUserData.goals || [],
+        barriers: localUserData.barriers || [],
+        healthyHabits: localUserData.healthyHabits || [],
+        mealPlanning: localUserData.mealPlanning || '',
+        mealPlanOptIn: localUserData.mealPlanOptIn || '',
+      };
+
       // 检查本地数据是否完整
       const isCompleteProfile = localUserData.sex && 
                                 localUserData.age && 
@@ -93,7 +121,7 @@ export const useAppStore = create((set, get) => ({
         isComplete: isCompleteProfile
       });
       
-      set({ profile: localUserData, isOnboarded: isCompleteProfile });
+      set({ profile: hydratedProfile, isOnboarded: isCompleteProfile });
       console.log('本地用户数据加载完成，profile:', localUserData);
       console.log('isOnboarded:', isCompleteProfile);
       
