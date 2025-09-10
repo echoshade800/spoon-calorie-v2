@@ -370,10 +370,12 @@ export default function OnboardingScreen() {
       // Update app state
       setProfile(completeProfile);
       
-      // Sync to server immediately
+      // Sync to server in background (don't block navigation)
       try {
-        const { syncUserData } = useAppStore.getState();
-        await syncUserData();
+        setTimeout(async () => {
+          const { syncUserData } = useAppStore.getState();
+          await syncUserData();
+        }, 1000);
         console.log('User data synced to server successfully');
       } catch (error) {
         console.error('Server sync failed, but continuing with local data:', error);

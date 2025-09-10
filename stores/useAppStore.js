@@ -74,20 +74,28 @@ export const useAppStore = create((set, get) => ({
       }
       
       // 检查本地数据是否完整
-      const isCompleteProfile = localUserData.calorie_goal && localUserData.bmr && localUserData.tdee;
+      const isCompleteProfile = localUserData.sex && 
+                                localUserData.age && 
+                                localUserData.height_cm && 
+                                localUserData.weight_kg && 
+                                localUserData.calorie_goal && 
+                                localUserData.bmr && 
+                                localUserData.tdee;
 
-      // 更新本地状态 - 确保所有必要字段都存在
-      const profileData = {
-        ...localUserData,
-        // 确保必要的字段存在，如果缺失则使用默认值
-        dateOfBirth: localUserData.dateOfBirth || calculateDefaultDateOfBirth(localUserData.age),
-        startingWeight: localUserData.startingWeight || localUserData.weight_kg,
-        startingWeightDate: localUserData.startingWeightDate || new Date().toISOString().split('T')[0],
-        weeklyGoal: localUserData.weeklyGoal || -0.5, // 默认减重0.5磅/周
-      };
+      console.log('用户数据完整性检查:', {
+        sex: !!localUserData.sex,
+        age: !!localUserData.age,
+        height_cm: !!localUserData.height_cm,
+        weight_kg: !!localUserData.weight_kg,
+        calorie_goal: !!localUserData.calorie_goal,
+        bmr: !!localUserData.bmr,
+        tdee: !!localUserData.tdee,
+        isComplete: isCompleteProfile
+      });
       
       set({ profile: localUserData, isOnboarded: isCompleteProfile });
-      console.log('本地用户数据加载完成，isOnboarded:', isCompleteProfile);
+      console.log('本地用户数据加载完成，profile:', localUserData);
+      console.log('isOnboarded:', isCompleteProfile);
       
       // 如果数据完整，尝试后台同步到服务器
       if (isCompleteProfile) {
@@ -125,7 +133,13 @@ export const useAppStore = create((set, get) => ({
       }
       
       // 检查是否为完整的用户数据（已完成 onboarding）
-      const isCompleteProfile = profile.calorie_goal && profile.bmr && profile.tdee;
+      const isCompleteProfile = profile.sex && 
+                                profile.age && 
+                                profile.height_cm && 
+                                profile.weight_kg && 
+                                profile.calorie_goal && 
+                                profile.bmr && 
+                                profile.tdee;
 
       if (!isCompleteProfile) {
         console.log('用户资料不完整，跳过服务器同步');
@@ -139,9 +153,8 @@ export const useAppStore = create((set, get) => ({
       
       if (response.success) {
         console.log('用户数据同步成功');
-        // 保存服务器返回的完整数据到本地
-        await StorageUtils.setUserData(response.user);
-        set({ profile: response.user, isOnboarded: true });
+        // 更新本地状态
+        set({ profile: response.user || profile, isOnboarded: true });
       } else {
         console.log('服务器同步跳过:', response.message);
       }
