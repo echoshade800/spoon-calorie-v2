@@ -72,27 +72,6 @@ export default function HomeScreen() {
   const getProgressColor = () => {
     if (adjustedRemaining > 200) return '#007AFF'; // Blue like MyFitnessPal
     if (adjustedRemaining > 0) return '#FF9500'; // Orange - close
-    return '#FF3B30'; // Red - over
-  };
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Today Section */}
-      <View style={styles.todaySection}>
-        <View style={styles.todayHeader}>
-          <Text style={styles.todayTitle}>Today</Text>
-          <TouchableOpacity onPress={() => setShowGoalsModal(true)}>
-            <Text style={styles.editButton}>Edit</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Calories Card */}
-        <View style={styles.caloriesCard}>
-          <Text style={styles.caloriesTitle}>Calories</Text>
-          <Text style={styles.caloriesSubtitle}>
-            Remaining = Goal - Food + Exercise
-          </Text>
-
           <View style={styles.progressContainer}>
             {/* Progress Ring */}
             <View style={styles.progressRingContainer}>
