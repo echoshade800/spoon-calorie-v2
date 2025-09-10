@@ -1,5 +1,5 @@
 /**
- * Complete Onboarding Flow - 13-step questionnaire for calorie tracking setup
+ * Complete Onboarding Flow - 15-step questionnaire for calorie tracking setup
  * 
  * Purpose: Comprehensive user profiling and goal setting with BMR/TDEE calculations
  * Features: Multi-step form, validation, progress tracking, personalized recommendations
@@ -22,17 +22,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/useAppStore';
 import { StorageUtils } from '@/utils/StorageUtils';
 
-const TOTAL_STEPS = 13;
+const TOTAL_STEPS = 15;
 
 const GOAL_OPTIONS = [
-  { id: 'lose_weight', label: 'Lose Weight', icon: 'trending-down' },
-  { id: 'maintain_weight', label: 'Maintain Weight', icon: 'remove' },
-  { id: 'gain_weight', label: 'Gain Weight', icon: 'trending-up' },
-  { id: 'gain_muscle', label: 'Gain Muscle', icon: 'fitness' },
-  { id: 'modify_diet', label: 'Modify My Diet', icon: 'restaurant' },
-  { id: 'plan_meals', label: 'Plan Meals', icon: 'calendar' },
-  { id: 'manage_stress', label: 'Manage Stress', icon: 'heart' },
-  { id: 'stay_active', label: 'Stay Active', icon: 'walk' },
+  { id: 'lose_weight', label: 'Lose Weight', icon: 'trending-down', isWeightGoal: true },
+  { id: 'maintain_weight', label: 'Maintain Weight', icon: 'remove', isWeightGoal: true },
+  { id: 'gain_weight', label: 'Gain Weight', icon: 'trending-up', isWeightGoal: true },
+  { id: 'gain_muscle', label: 'Gain Muscle', icon: 'fitness', isWeightGoal: false },
+  { id: 'modify_diet', label: 'Modify My Diet', icon: 'restaurant', isWeightGoal: false },
+  { id: 'plan_meals', label: 'Plan Meals', icon: 'calendar', isWeightGoal: false },
+  { id: 'manage_stress', label: 'Manage Stress', icon: 'heart', isWeightGoal: false },
+  { id: 'stay_active', label: 'Stay Active', icon: 'walk', isWeightGoal: false },
 ];
 
 const BARRIER_OPTIONS = [
@@ -93,10 +93,12 @@ const ACTIVITY_LEVELS = [
 ];
 
 const WEEKLY_GOALS = [
-  { value: 0.25, label: 'Lose 0.5 lb per week', sublabel: '(Recommended)', kcalDelta: -250 },
-  { value: 0.5, label: 'Lose 1.0 lb per week', sublabel: '', kcalDelta: -500 },
-  { value: 0.75, label: 'Lose 1.5 lb per week', sublabel: '', kcalDelta: -750 },
-  { value: 1.0, label: 'Lose 2.0 lb per week', sublabel: '', kcalDelta: -1000 },
+  { value: -0.5, label: 'Lose 0.5 lb per week', sublabel: '(Recommended)', kcalDelta: -250, metricLabel: 'Lose 0.25 kg per week' },
+  { value: -1.0, label: 'Lose 1.0 lb per week', sublabel: '', kcalDelta: -500, metricLabel: 'Lose 0.5 kg per week' },
+  { value: -1.5, label: 'Lose 1.5 lb per week', sublabel: '', kcalDelta: -750, metricLabel: 'Lose 0.75 kg per week' },
+  { value: -2.0, label: 'Lose 2.0 lb per week', sublabel: '', kcalDelta: -1000, metricLabel: 'Lose 1.0 kg per week' },
+  { value: 0.5, label: 'Gain 0.5 lb per week', sublabel: '', kcalDelta: 250, metricLabel: 'Gain 0.25 kg per week' },
+  { value: 1.0, label: 'Gain 1.0 lb per week', sublabel: '', kcalDelta: 500, metricLabel: 'Gain 0.5 kg per week' },
 ];
 
 const COUNTRIES = [
@@ -126,12 +128,14 @@ export default function OnboardingScreen() {
     // Step 11
     sex: '',
     age: '',
-    country: '',
     // Step 12
-    weeklyGoal: 0.25,
-    // Additional fields for calculation
     height_cm: '',
     weight_kg: '',
+    goal_weight_kg: '',
+    heightUnit: 'cm', // cm or ft
+    weightUnit: 'kg', // kg, lb, or st
+    // Step 14
+    weeklyGoal: -0.5,
   });
 
   const updateFormData = (key, value) => {
@@ -167,10 +171,41 @@ export default function OnboardingScreen() {
     });
   };
 
+  const toggleGoal = (goalId) => {
+    setFormData(prev => {
+      const currentGoals = prev.goals || [];
+      const goal = GOAL_OPTIONS.find(g => g.id === goalId);
+      
+      if (goal.isWeightGoal) {
+        // Weight goals are mutually exclusive
+        const otherWeightGoals = currentGoals.filter(g => {
+          const goalOption = GOAL_OPTIONS.find(opt => opt.id === g);
+          return goalOption && !goalOption.isWeightGoal;
+        });
+        
+        if (currentGoals.includes(goalId)) {
+          // Remove this weight goal
+          return { ...prev, goals: otherWeightGoals };
+        } else {
+          // Add this weight goal, remove others
+          return { ...prev, goals: [...otherWeightGoals, goalId] };
+        }
+      } else {
+        // Non-weight goals can be multi-selected
+        if (currentGoals.includes(goalId)) {
+          return { ...prev, goals: currentGoals.filter(g => g !== goalId) };
+        } else if (currentGoals.length < 3) {
+          return { ...prev, goals: [...currentGoals, goalId] };
+        }
+        return prev; // Can't add more than 3
+      }
+    });
+  };
+
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.goals.length >= 1 && formData.goals.length <= 3;
+        return formData.goals.length >= 1;
       case 3:
         return formData.barriers.length >= 1;
       case 5:
@@ -182,17 +217,19 @@ export default function OnboardingScreen() {
       case 10:
         return formData.activityLevel !== '';
       case 11:
-        return formData.sex !== '' && formData.age !== '' && formData.country !== '';
+        return formData.sex !== '' && formData.age !== '';
       case 12:
-        return formData.weeklyGoal !== null && formData.height_cm !== '' && formData.weight_kg !== '';
+        return formData.height_cm !== '' && formData.weight_kg !== '' && formData.goal_weight_kg !== '';
+      case 14:
+        return formData.weeklyGoal !== null;
       default:
         return true;
     }
   };
 
   const handleNext = () => {
+    // Validation for specific steps
     if (currentStep === 11) {
-      // Validate age
       const age = parseInt(formData.age);
       if (isNaN(age) || age < 13 || age > 120) {
         Alert.alert('Invalid Age', 'Please enter an age between 13 and 120');
@@ -201,9 +238,9 @@ export default function OnboardingScreen() {
     }
     
     if (currentStep === 12) {
-      // Validate height and weight
       const height = parseFloat(formData.height_cm);
       const weight = parseFloat(formData.weight_kg);
+      const goalWeight = parseFloat(formData.goal_weight_kg);
       
       if (isNaN(height) || height < 100 || height > 250) {
         Alert.alert('Invalid Height', 'Please enter a height between 100 and 250 cm');
@@ -212,6 +249,11 @@ export default function OnboardingScreen() {
       
       if (isNaN(weight) || weight < 30 || weight > 300) {
         Alert.alert('Invalid Weight', 'Please enter a weight between 30 and 300 kg');
+        return;
+      }
+      
+      if (isNaN(goalWeight) || goalWeight < 30 || goalWeight > 300) {
+        Alert.alert('Invalid Goal Weight', 'Please enter a goal weight between 30 and 300 kg');
         return;
       }
     }
@@ -229,20 +271,23 @@ export default function OnboardingScreen() {
     }
   };
 
+  // BMR calculation using Mifflin-St Jeor formula
   const calculateBMR = (sex, weight, height, age) => {
-    // Mifflin-St Jeor formula
-    if (sex === 'male') {
-      return 10 * weight + 6.25 * height - 5 * age + 5;
-    } else {
-      return 10 * weight + 6.25 * height - 5 * age - 161;
-    }
+    const W = weight; // kg
+    const H = height; // cm
+    const A = age; // years
+    const C = sex === 'male' ? 5 : -161;
+    
+    return 10 * W + 6.25 * H - 5 * A + C;
   };
 
+  // TDEE calculation
   const calculateTDEE = (bmr, activityLevel) => {
     const activityData = ACTIVITY_LEVELS.find(level => level.value === activityLevel);
     return bmr * (activityData?.factor || 1.40);
   };
 
+  // Daily goal calculation
   const calculateDailyGoal = (tdee, weeklyGoal) => {
     const goalData = WEEKLY_GOALS.find(goal => goal.value === weeklyGoal);
     const dailyGoal = tdee + (goalData?.kcalDelta || 0);
@@ -258,7 +303,20 @@ export default function OnboardingScreen() {
     });
   };
 
-  const handleComplete = () => {
+  const getWeightChangeEstimate = () => {
+    const currentWeight = parseFloat(formData.weight_kg);
+    const goalWeight = parseFloat(formData.goal_weight_kg);
+    const weightDiff = Math.abs(goalWeight - currentWeight);
+    const isGaining = goalWeight > currentWeight;
+    
+    return {
+      amount: weightDiff.toFixed(1),
+      direction: isGaining ? 'gain' : 'lose',
+      verb: isGaining ? 'Gain' : 'Lose'
+    };
+  };
+
+  const handleComplete = async () => {
     try {
       const weight = parseFloat(formData.weight_kg);
       const height = parseFloat(formData.height_cm);
@@ -269,6 +327,14 @@ export default function OnboardingScreen() {
       const tdee = calculateTDEE(bmr, formData.activityLevel);
       const dailyGoal = calculateDailyGoal(tdee, formData.weeklyGoal);
 
+      // Determine goal type from selected goals
+      let goalType = 'maintain';
+      if (formData.goals.includes('lose_weight')) {
+        goalType = 'lose';
+      } else if (formData.goals.includes('gain_weight') || formData.goals.includes('gain_muscle')) {
+        goalType = 'gain';
+      }
+
       // Create complete profile
       const completeProfile = {
         uid: StorageUtils.generateUID(),
@@ -276,9 +342,9 @@ export default function OnboardingScreen() {
         age: age,
         height_cm: height,
         weight_kg: weight,
+        goal_weight_kg: parseFloat(formData.goal_weight_kg),
         activity_level: formData.activityLevel,
-        goal_type: formData.goals.includes('lose_weight') ? 'lose' : 
-                  formData.goals.includes('gain_weight') ? 'gain' : 'maintain',
+        goal_type: goalType,
         rate_kcal_per_day: Math.abs(WEEKLY_GOALS.find(g => g.value === formData.weeklyGoal)?.kcalDelta || 250),
         calorie_goal: dailyGoal,
         macro_c: 45, // Default macro percentages
@@ -292,7 +358,6 @@ export default function OnboardingScreen() {
         healthyHabits: formData.healthyHabits,
         mealPlanning: formData.mealPlanning,
         mealPlanOptIn: formData.mealPlanOptIn,
-        country: formData.country,
         weeklyGoal: formData.weeklyGoal,
       };
 
@@ -330,8 +395,10 @@ export default function OnboardingScreen() {
       case 9: return renderMealPlanOptInStep();
       case 10: return renderActivityLevelStep();
       case 11: return renderPersonalInfoStep();
-      case 12: return renderWeeklyGoalStep();
-      case 13: return renderPlanReadyStep();
+      case 12: return renderHeightWeightStep();
+      case 13: return renderWeightChangeEstimationStep();
+      case 14: return renderWeeklyGoalStep();
+      case 15: return renderPlanReadyStep();
       default: return null;
     }
   };
@@ -345,30 +412,39 @@ export default function OnboardingScreen() {
           const isSelected = formData.goals.includes(goal.id);
           const isDisabled = !isSelected && formData.goals.length >= 3;
           
+          // Check if this is a weight goal and if another weight goal is selected
+          const isWeightGoalDisabled = goal.isWeightGoal && 
+            formData.goals.some(selectedGoal => {
+              const selectedOption = GOAL_OPTIONS.find(opt => opt.id === selectedGoal);
+              return selectedOption && selectedOption.isWeightGoal && selectedGoal !== goal.id;
+            });
+          
+          const finalDisabled = isDisabled || isWeightGoalDisabled;
+          
           return (
             <TouchableOpacity
               key={goal.id}
               style={[
                 styles.goalOption,
                 isSelected && styles.selectedOption,
-                isDisabled && styles.disabledOption,
+                finalDisabled && styles.disabledOption,
               ]}
               onPress={() => {
-                if (!isDisabled) {
-                  toggleArrayItem('goals', goal.id);
+                if (!finalDisabled) {
+                  toggleGoal(goal.id);
                 }
               }}
-              disabled={isDisabled}
+              disabled={finalDisabled}
             >
               <Ionicons 
                 name={goal.icon} 
                 size={24} 
-                color={isSelected ? '#4CAF50' : isDisabled ? '#ccc' : '#666'} 
+                color={isSelected ? '#4CAF50' : finalDisabled ? '#ccc' : '#666'} 
               />
               <Text style={[
                 styles.goalOptionText,
                 isSelected && styles.selectedOptionText,
-                isDisabled && styles.disabledOptionText,
+                finalDisabled && styles.disabledOptionText,
               ]}>
                 {goal.label}
               </Text>
@@ -383,14 +459,29 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  const renderMotivationStep = () => (
-    <View style={[styles.stepContent, styles.motivationStep]}>
-      <Text style={styles.motivationTitle}>OK, real talk:</Text>
-      <Text style={styles.motivationBody}>
-        Losing weight isn't always easy. But we'll motivate you through the ups and downs—so you can hit that goal!
-      </Text>
-    </View>
-  );
+  const renderMotivationStep = () => {
+    const primaryGoal = formData.goals[0];
+    let title = "OK, real talk:";
+    let body = "We'll motivate you through the ups and downs—so you can hit that goal!";
+    
+    if (primaryGoal === 'lose_weight') {
+      title = "OK, real talk:";
+      body = "Losing weight isn't always easy. But we'll motivate you through the ups and downs—so you can hit that goal!";
+    } else if (primaryGoal === 'maintain_weight') {
+      title = "Consistency is the secret to lasting results.";
+      body = "We'll help you build sustainable habits that keep you on track every day.";
+    } else if (primaryGoal === 'gain_weight') {
+      title = "Building up takes patience, but it's worth it.";
+      body = "We'll guide you through healthy weight gain with the right nutrition and timing.";
+    }
+    
+    return (
+      <View style={[styles.stepContent, styles.motivationStep]}>
+        <Text style={styles.motivationTitle}>{title}</Text>
+        <Text style={styles.motivationBody}>{body}</Text>
+      </View>
+    );
+  };
 
   const renderBarriersStep = () => (
     <View style={styles.stepContent}>
@@ -431,24 +522,14 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  const renderEmpathyStep = () => {
-    const hasTimeBarrier = formData.barriers.includes('lack_time');
-    const hasHardBarrier = formData.barriers.includes('too_hard');
-    
-    let empathyText = "We understand that everyone's journey is unique.";
-    
-    if (hasTimeBarrier) {
-      empathyText = "We get it. A busy lifestyle can easily get in the way of reaching your goals.";
-    } else if (hasHardBarrier) {
-      empathyText = "We understand. Finding the right approach that works for you is key to success.";
-    }
-    
-    return (
-      <View style={[styles.stepContent, styles.motivationStep]}>
-        <Text style={styles.empathyBody}>{empathyText}</Text>
-      </View>
-    );
-  };
+  const renderEmpathyStep = () => (
+    <View style={[styles.stepContent, styles.motivationStep]}>
+      <Text style={styles.motivationTitle}>We get it.</Text>
+      <Text style={styles.motivationBody}>
+        A busy lifestyle can easily get in the way of reaching your goals. Luckily we know all about managing potential pitfalls—because we've helped millions of people reach theirs.
+      </Text>
+    </View>
+  );
 
   const renderHealthyHabitsStep = () => (
     <View style={styles.stepContent}>
@@ -519,25 +600,28 @@ export default function OnboardingScreen() {
     
     switch (formData.mealPlanning) {
       case 'never':
-        feedbackText = "No worries! We'll help you get started with meal planning.";
+        feedbackText = "You're just getting started.";
         break;
       case 'rarely':
-        feedbackText = "That's okay! Small steps toward planning can make a big difference.";
+        feedbackText = "You're building the foundation.";
         break;
       case 'occasionally':
-        feedbackText = "You're on the right track! We can help you plan more consistently.";
+        feedbackText = "You're on the right track!";
         break;
       case 'frequently':
         feedbackText = "You're a steady planner.";
         break;
       case 'always':
-        feedbackText = "Wow! You're a meal planning pro.";
+        feedbackText = "You're a meal planning pro.";
         break;
     }
     
     return (
       <View style={[styles.stepContent, styles.motivationStep]}>
-        <Text style={styles.feedbackText}>{feedbackText}</Text>
+        <Text style={styles.motivationTitle}>{feedbackText}</Text>
+        <Text style={styles.motivationBody}>
+          We'll help you take your meal planning to the next level with personalized suggestions.
+        </Text>
       </View>
     );
   };
@@ -643,67 +727,155 @@ export default function OnboardingScreen() {
           maxLength={3}
         />
       </View>
-
-      {/* Country */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Where do you live?</Text>
-        <ScrollView style={styles.countryList} showsVerticalScrollIndicator={false}>
-          {COUNTRIES.map((country) => (
-            <TouchableOpacity
-              key={country}
-              style={[
-                styles.countryOption,
-                formData.country === country && styles.selectedCountryOption,
-              ]}
-              onPress={() => updateFormData('country', country)}
-            >
-              <Text style={[
-                styles.countryText,
-                formData.country === country && styles.selectedCountryText,
-              ]}>
-                {country}
-              </Text>
-              {formData.country === country && (
-                <Ionicons name="checkmark" size={20} color="#4CAF50" />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
     </View>
   );
 
-  const renderWeeklyGoalStep = () => (
+  const renderHeightWeightStep = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.question}>What is your weekly goal?</Text>
+      <Text style={styles.question}>Just a few more questions</Text>
       
-      {/* Height and Weight inputs first */}
-      <View style={styles.physicalInputs}>
-        <View style={styles.physicalInputGroup}>
-          <Text style={styles.inputLabel}>Height (cm)</Text>
+      {/* Height */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Height</Text>
+        <View style={styles.unitInputContainer}>
           <TextInput
-            style={styles.input}
+            style={styles.unitInput}
             value={formData.height_cm}
             onChangeText={(text) => updateFormData('height_cm', text)}
             placeholder="170"
             keyboardType="numeric"
           />
+          <View style={styles.unitSelector}>
+            <TouchableOpacity
+              style={[
+                styles.unitButton,
+                formData.heightUnit === 'cm' && styles.selectedUnitButton
+              ]}
+              onPress={() => updateFormData('heightUnit', 'cm')}
+            >
+              <Text style={[
+                styles.unitButtonText,
+                formData.heightUnit === 'cm' && styles.selectedUnitButtonText
+              ]}>cm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.unitButton,
+                formData.heightUnit === 'ft' && styles.selectedUnitButton
+              ]}
+              onPress={() => updateFormData('heightUnit', 'ft')}
+            >
+              <Text style={[
+                styles.unitButtonText,
+                formData.heightUnit === 'ft' && styles.selectedUnitButtonText
+              ]}>ft</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        
-        <View style={styles.physicalInputGroup}>
-          <Text style={styles.inputLabel}>Weight (kg)</Text>
+      </View>
+
+      {/* Current Weight */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Current Weight</Text>
+        <View style={styles.unitInputContainer}>
           <TextInput
-            style={styles.input}
+            style={styles.unitInput}
             value={formData.weight_kg}
             onChangeText={(text) => updateFormData('weight_kg', text)}
             placeholder="70"
             keyboardType="numeric"
           />
+          <View style={styles.unitSelector}>
+            <TouchableOpacity
+              style={[
+                styles.unitButton,
+                formData.weightUnit === 'kg' && styles.selectedUnitButton
+              ]}
+              onPress={() => updateFormData('weightUnit', 'kg')}
+            >
+              <Text style={[
+                styles.unitButtonText,
+                formData.weightUnit === 'kg' && styles.selectedUnitButtonText
+              ]}>kg</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.unitButton,
+                formData.weightUnit === 'lb' && styles.selectedUnitButton
+              ]}
+              onPress={() => updateFormData('weightUnit', 'lb')}
+            >
+              <Text style={[
+                styles.unitButtonText,
+                formData.weightUnit === 'lb' && styles.selectedUnitButtonText
+              ]}>lb</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
+
+      {/* Goal Weight */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Goal Weight</Text>
+        <View style={styles.unitInputContainer}>
+          <TextInput
+            style={styles.unitInput}
+            value={formData.goal_weight_kg}
+            onChangeText={(text) => updateFormData('goal_weight_kg', text)}
+            placeholder="65"
+            keyboardType="numeric"
+          />
+          <View style={styles.unitSelector}>
+            <TouchableOpacity
+              style={[
+                styles.unitButton,
+                formData.weightUnit === 'kg' && styles.selectedUnitButton
+              ]}
+              onPress={() => updateFormData('weightUnit', 'kg')}
+            >
+              <Text style={[
+                styles.unitButtonText,
+                formData.weightUnit === 'kg' && styles.selectedUnitButtonText
+              ]}>kg</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.unitButton,
+                formData.weightUnit === 'lb' && styles.selectedUnitButton
+              ]}
+              onPress={() => updateFormData('weightUnit', 'lb')}
+            >
+              <Text style={[
+                styles.unitButtonText,
+                formData.weightUnit === 'lb' && styles.selectedUnitButtonText
+              ]}>lb</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderWeightChangeEstimationStep = () => {
+    const estimate = getWeightChangeEstimate();
+    const targetDate = getTargetDate();
+    
+    return (
+      <View style={[styles.stepContent, styles.motivationStep]}>
+        <Text style={styles.motivationTitle}>
+          You should {estimate.verb.toLowerCase()} {estimate.amount} kg by {targetDate}
+        </Text>
+        <Text style={styles.motivationBody}>
+          Don't worry, this doesn't affect your daily calorie goal and you can always change it later.
+        </Text>
+      </View>
+    );
+  };
+
+  const renderWeeklyGoalStep = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.question}>What is your weekly goal?</Text>
       
-      {/* Weekly goal options */}
-      <Text style={styles.goalSectionTitle}>Weekly Goal</Text>
       {WEEKLY_GOALS.map((goal) => (
         <TouchableOpacity
           key={goal.value}
@@ -719,6 +891,9 @@ export default function OnboardingScreen() {
               formData.weeklyGoal === goal.value && styles.selectedOptionText,
             ]}>
               {goal.label}
+            </Text>
+            <Text style={styles.weeklyGoalMetric}>
+              {goal.metricLabel}
             </Text>
             {goal.sublabel && (
               <Text style={styles.weeklyGoalSublabel}>{goal.sublabel}</Text>
@@ -746,7 +921,7 @@ export default function OnboardingScreen() {
       fat: Math.round((dailyGoal * 30 / 100) / 9),
     };
 
-    const targetWeight = formData.weeklyGoal * 12; // 3 months
+    const estimate = getWeightChangeEstimate();
     const targetDate = getTargetDate();
 
     return (
@@ -760,7 +935,7 @@ export default function OnboardingScreen() {
           <Text style={styles.heroTitle}>Your personalized plan is ready!</Text>
           
           <Text style={styles.targetText}>
-            Target: Lose {targetWeight.toFixed(1)} kg by {targetDate}
+            Target: {estimate.verb} {estimate.amount} kg by {targetDate}
           </Text>
         </View>
 
@@ -834,14 +1009,16 @@ export default function OnboardingScreen() {
       9: 'Meal Plans',
       10: 'Activity Level',
       11: 'Personal Info',
-      12: 'Weekly Goal',
-      13: 'Plan Ready',
+      12: 'Physical Info',
+      13: 'Weight Estimation',
+      14: 'Weekly Goal',
+      15: 'Plan Ready',
     };
     return titles[currentStep] || 'Setup';
   };
 
   const isMotivationStep = () => {
-    return [2, 4, 6, 8].includes(currentStep);
+    return [2, 4, 6, 8, 13].includes(currentStep);
   };
 
   return (
@@ -855,6 +1032,7 @@ export default function OnboardingScreen() {
       {/* Header */}
       <View style={[
         styles.header,
+        { paddingTop: insets.top + 16 },
         isMotivationStep() && styles.motivationHeader
       ]}>
         <Text style={[
@@ -889,10 +1067,10 @@ export default function OnboardingScreen() {
       {/* Navigation */}
       <View style={[
         styles.navigation, 
-        { paddingBottom: insets.bottom + 8 },
+        { paddingBottom: insets.bottom + 16 },
         isMotivationStep() && styles.motivationNavigation
       ]}>
-        {currentStep > 1 && (
+        {currentStep > 1 ? (
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons 
               name="chevron-back" 
@@ -906,6 +1084,8 @@ export default function OnboardingScreen() {
               Back
             </Text>
           </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
         )}
         
         <TouchableOpacity 
@@ -919,14 +1099,15 @@ export default function OnboardingScreen() {
         >
           <Text style={[
             styles.nextText,
-            !canProceed() && styles.nextTextDisabled
+            !canProceed() && styles.nextTextDisabled,
+            isMotivationStep() && styles.motivationNextText
           ]}>
             {currentStep === TOTAL_STEPS ? "Let's get started!" : 'Next'}
           </Text>
           <Ionicons 
             name="chevron-forward" 
             size={24} 
-            color={!canProceed() ? "#ccc" : "#fff"} 
+            color={!canProceed() ? "#ccc" : isMotivationStep() ? "#4CAF50" : "#fff"} 
           />
         </TouchableOpacity>
       </View>
@@ -937,13 +1118,12 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F2F2F7',
   },
   motivationContainer: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4CAF50',
   },
   header: {
-    paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
@@ -953,7 +1133,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#333',
+    color: '#000',
     marginBottom: 8,
   },
   motivationHeaderText: {
@@ -961,13 +1141,14 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#8E8E93',
   },
   progressContainer: {
     height: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#E5E5EA',
     marginHorizontal: 20,
     borderRadius: 2,
+    marginBottom: 20,
   },
   progressBar: {
     height: '100%',
@@ -989,13 +1170,13 @@ const styles = StyleSheet.create({
   question: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
     marginBottom: 8,
     lineHeight: 30,
   },
   instruction: {
     fontSize: 16,
-    color: '#666',
+    color: '#8E8E93',
     marginBottom: 24,
   },
   
@@ -1019,13 +1200,13 @@ const styles = StyleSheet.create({
   },
   goalOptionText: {
     fontSize: 16,
-    color: '#333',
+    color: '#000',
     marginLeft: 12,
     flex: 1,
   },
   selectedOption: {
     borderColor: '#4CAF50',
-    backgroundColor: '#f8fff8',
+    backgroundColor: '#F8FFF8',
   },
   selectedOptionText: {
     color: '#4CAF50',
@@ -1035,11 +1216,11 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   disabledOptionText: {
-    color: '#ccc',
+    color: '#C7C7CC',
   },
   selectionHint: {
     fontSize: 14,
-    color: '#666',
+    color: '#8E8E93',
     textAlign: 'center',
   },
   
@@ -1059,20 +1240,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     opacity: 0.9,
   },
-  empathyBody: {
-    fontSize: 20,
-    color: '#fff',
-    textAlign: 'center',
-    lineHeight: 28,
-    opacity: 0.9,
-  },
-  feedbackText: {
-    fontSize: 24,
-    color: '#fff',
-    textAlign: 'center',
-    lineHeight: 32,
-    fontWeight: '600',
-  },
   
   // Barriers Step
   barriersList: {
@@ -1089,14 +1256,14 @@ const styles = StyleSheet.create({
   },
   selectedBarrierOption: {
     borderColor: '#4CAF50',
-    backgroundColor: '#f8fff8',
+    backgroundColor: '#F8FFF8',
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: '#C7C7CC',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1107,7 +1274,7 @@ const styles = StyleSheet.create({
   },
   barrierText: {
     fontSize: 16,
-    color: '#333',
+    color: '#000',
     flex: 1,
   },
   selectedBarrierText: {
@@ -1127,7 +1294,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E5EA',
     marginBottom: 8,
   },
   selectedHabitChip: {
@@ -1136,7 +1303,7 @@ const styles = StyleSheet.create({
   },
   habitChipText: {
     fontSize: 14,
-    color: '#333',
+    color: '#000',
     fontWeight: '500',
   },
   selectedHabitChipText: {
@@ -1154,7 +1321,7 @@ const styles = StyleSheet.create({
   },
   singleOptionText: {
     fontSize: 18,
-    color: '#333',
+    color: '#000',
   },
   
   // Activity Level
@@ -1172,12 +1339,12 @@ const styles = StyleSheet.create({
   activityLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
     marginBottom: 4,
   },
   activityDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#8E8E93',
   },
   
   // Personal Info
@@ -1187,16 +1354,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
     marginBottom: 8,
   },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E5EA',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: '#000',
   },
   sexButtons: {
     flexDirection: 'row',
@@ -1208,63 +1376,63 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E5EA',
     alignItems: 'center',
   },
   selectedSexButton: {
     borderColor: '#4CAF50',
-    backgroundColor: '#f8fff8',
+    backgroundColor: '#F8FFF8',
   },
   sexButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: '#000',
   },
   selectedSexButtonText: {
     color: '#4CAF50',
     fontWeight: '600',
   },
-  countryList: {
-    maxHeight: 200,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  countryOption: {
+  
+  // Height/Weight Step
+  unitInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
+  },
+  unitInput: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 8,
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  selectedCountryOption: {
-    backgroundColor: '#f8fff8',
-  },
-  countryText: {
     fontSize: 16,
-    color: '#333',
+    color: '#000',
   },
-  selectedCountryText: {
-    color: '#4CAF50',
+  unitSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 2,
+  },
+  unitButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  selectedUnitButton: {
+    backgroundColor: '#fff',
+  },
+  unitButtonText: {
+    fontSize: 14,
     fontWeight: '500',
+    color: '#8E8E93',
+  },
+  selectedUnitButtonText: {
+    color: '#000',
+    fontWeight: '600',
   },
   
   // Weekly Goal Step
-  physicalInputs: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  physicalInputGroup: {
-    flex: 1,
-  },
-  goalSectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
   weeklyGoalOption: {
     padding: 16,
     backgroundColor: '#fff',
@@ -1279,7 +1447,12 @@ const styles = StyleSheet.create({
   weeklyGoalLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
+  },
+  weeklyGoalMetric: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 2,
   },
   weeklyGoalSublabel: {
     fontSize: 14,
@@ -1311,12 +1484,12 @@ const styles = StyleSheet.create({
   },
   targetText: {
     fontSize: 18,
-    color: '#666',
+    color: '#8E8E93',
     textAlign: 'center',
     lineHeight: 24,
   },
   targetsCard: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
     marginTop: 32,
@@ -1347,15 +1520,10 @@ const styles = StyleSheet.create({
   targetTile: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F9FA',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   tileHeader: {
     flexDirection: 'row',
@@ -1367,7 +1535,7 @@ const styles = StyleSheet.create({
   tileLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
+    color: '#8E8E93',
   },
   tileValue: {
     fontSize: 24,
@@ -1385,10 +1553,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#E5E5EA',
   },
   motivationNavigation: {
     backgroundColor: 'transparent',
@@ -1398,10 +1567,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    minWidth: 80,
   },
   backText: {
     fontSize: 16,
-    color: '#666',
+    color: '#8E8E93',
     marginLeft: 4,
   },
   motivationNavText: {
@@ -1416,7 +1586,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   nextButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#E5E5EA',
   },
   motivationNextButton: {
     backgroundColor: '#fff',
@@ -1428,6 +1598,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   nextTextDisabled: {
-    color: '#999',
+    color: '#C7C7CC',
+  },
+  motivationNextText: {
+    color: '#4CAF50',
   },
 });
