@@ -81,6 +81,48 @@ export const useAppStore = create((set, get) => ({
     };
   },
   
+  // 重新计算BMR、TDEE和Daily Goal
+  recalculateGoals: (updatedProfile) => {
+    const { sex, age, height_cm, weight_kg, activity_level, weeklyGoal } = updatedProfile;
+    
+    if (!sex || !age || !height_cm || !weight_kg || !activity_level) {
+      return updatedProfile; // 缺少必要数据，不重新计算
+    }
+
+    // BMR计算 (Mifflin-St Jeor公式)
+    const W = parseFloat(weight_kg);
+    const H = parseFloat(height_cm);
+    const A = parseInt(age);
+    const C = sex === 'male' ? 5 : -161;
+    const bmr = 10 * W + 6.25 * H - 5 * A + C;
+
+    // TDEE计算
+    const activityFactors = {
+      sedentary: 1.40,
+      lightly_active: 1.60,
+      moderately_active: 1.80,
+      very_active: 2.00,
+      extra_active: 2.20,
+    };
+    const factor = activityFactors[activity_level] || 1.40;
+    const tdee = bmr * factor;
+
+    // Daily Goal计算
+    const weeklyGoalDeltas = {
+      '-1.0': -500, '-0.75': -375, '-0.5': -250,
+      '0': 0, '0.5': 250, '1.0': 500
+    };
+    const delta = weeklyGoalDeltas[weeklyGoal?.toString()] || 0;
+    const dailyGoal = Math.round((tdee + delta) / 10) * 10;
+
+    return {
+      ...updatedProfile,
+      bmr: Math.round(bmr),
+      tdee: Math.round(tdee),
+      calorie_goal: dailyGoal,
+    };
+  },
+  
   // Database initialization
   initializeApp: async () => {
     try {
