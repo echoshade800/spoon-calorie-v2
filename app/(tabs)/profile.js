@@ -782,6 +782,7 @@ const styles = StyleSheet.create({
             </Text>
           </TouchableOpacity>
         </View>
+      </ScrollView>
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
