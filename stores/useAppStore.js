@@ -143,6 +143,15 @@ export const useAppStore = create((set, get) => ({
       // 使用包含正确 UID 的 profile 数据进行同步
       const profileToSync = { ...profile, uid: finalUid };
       
+      console.log('准备同步的用户数据:', {
+        uid: profileToSync.uid,
+        hasGoals: !!profileToSync.goals,
+        hasBarriers: !!profileToSync.barriers,
+        hasHealthyHabits: !!profileToSync.healthyHabits,
+        mealPlanning: profileToSync.mealPlanning,
+        weeklyGoal: profileToSync.weeklyGoal
+      });
+      
       // 同步到服务器
       const response = await API.syncUser(profileToSync);
       

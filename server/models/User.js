@@ -114,6 +114,28 @@ export class User {
       if (!existingUser) {
         console.log('用户不存在，创建新用户:', userData.uid);
         const newUser = await User.create(userData);
+        
+        // 同时保存新手引导数据
+        if (userData.goals || userData.barriers || userData.healthyHabits) {
+          try {
+            const { UserOnboardingData } = await import('./UserOnboardingData.js');
+            await UserOnboardingData.createOrUpdate(userData.uid, {
+              goals: userData.goals,
+              barriers: userData.barriers,
+              healthyHabits: userData.healthyHabits,
+              mealPlanning: userData.mealPlanning,
+              mealPlanOptIn: userData.mealPlanOptIn,
+              weeklyGoal: userData.weeklyGoal,
+              goal_weight_kg: userData.goal_weight_kg,
+              heightUnit: userData.heightUnit,
+              weightUnit: userData.weightUnit,
+            });
+            console.log('新手引导数据保存成功');
+          } catch (onboardingError) {
+            console.error('保存新手引导数据失败:', onboardingError);
+          }
+        }
+        
         return newUser;
       }
       
@@ -138,6 +160,28 @@ export class User {
         });
         
         const updatedUser = await User.update(userData.uid, updates);
+        
+        // 同时更新新手引导数据
+        if (userData.goals || userData.barriers || userData.healthyHabits) {
+          try {
+            const { UserOnboardingData } = await import('./UserOnboardingData.js');
+            await UserOnboardingData.createOrUpdate(userData.uid, {
+              goals: userData.goals,
+              barriers: userData.barriers,
+              healthyHabits: userData.healthyHabits,
+              mealPlanning: userData.mealPlanning,
+              mealPlanOptIn: userData.mealPlanOptIn,
+              weeklyGoal: userData.weeklyGoal,
+              goal_weight_kg: userData.goal_weight_kg,
+              heightUnit: userData.heightUnit,
+              weightUnit: userData.weightUnit,
+            });
+            console.log('新手引导数据更新成功');
+          } catch (onboardingError) {
+            console.error('更新新手引导数据失败:', onboardingError);
+          }
+        }
+        
         return  updatedUser ;
       }
       

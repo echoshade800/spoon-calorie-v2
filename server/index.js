@@ -7,6 +7,7 @@ import { Food } from './models/Food.js';
 import { MyMeal } from './models/MyMeal.js';
 import { DiaryEntry } from './models/DiaryEntry.js';
 import { ExerciseEntry } from './models/ExerciseEntry.js';
+import { UserOnboardingData } from './models/UserOnboardingData.js';
 import { OpenAIService } from './services/openaiService.js';
 
 const app = express();
@@ -177,6 +178,26 @@ const initializeTables = async () => {
       )
     `);
     
+    // 创建新手引导数据表
+    await executeQuery(`
+      CREATE TABLE IF NOT EXISTS user_onboarding_data (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_uid VARCHAR(255) UNIQUE NOT NULL,
+        goals JSON,
+        barriers JSON,
+        healthy_habits JSON,
+        meal_planning ENUM('never', 'rarely', 'occasionally', 'frequently', 'always'),
+        meal_plan_opt_in ENUM('yes', 'open', 'no'),
+        weekly_goal DECIMAL(3,1),
+        goal_weight_kg DECIMAL(5,2),
+        height_unit ENUM('cm', 'ft') DEFAULT 'cm',
+        weight_unit ENUM('kg', 'lb', 'st') DEFAULT 'kg',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_user_uid (user_uid)
+      )
+    `);
+    
     // 插入示例食物数据
     await executeQuery(`
       INSERT IGNORE INTO foods (id, name, brand, kcal_per_100g, carbs_per_100g, protein_per_100g, fat_per_100g, serving_label, grams_per_serving, source, category) VALUES
@@ -227,7 +248,21 @@ app.get('/api/users/:uid', async (req, res) => {
       return res.status(404).json({ error: '用户不存在' });
     }
     
-    res.json({ success: true, user });
+    // 同时获取新手引导数据
+    let onboardingData = null;
+    try {
+      onboardingData = await UserOnboardingData.findByUserUid(uid);
+    } catch (error) {
+      console.warn('获取新手引导数据失败:', error);
+    }
+    
+    // 合并用户数据和新手引导数据
+    const completeUserData = {
+      ...user,
+      ...(onboardingData || {})
+    };
+    
+    res.json({ success: true, user: completeUserData });
   } catch (error) {
     console.error('获取用户失败:', error);
     res.status(500).json({ error: '获取用户失败' });
