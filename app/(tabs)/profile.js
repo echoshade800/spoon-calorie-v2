@@ -140,21 +140,21 @@ export default function ProfileScreen() {
   // 获取活动水平显示文本
   const getActivityLevelDisplay = () => {
     const activityLevel = profile?.activity_level;
-    console.log('Activity level from profile:', activityLevel);
+    console.log('Activity level from profile:', activityLevel, 'Type:', typeof activityLevel);
     return activityLevel ? ACTIVITY_LEVEL_LABELS[activityLevel] || activityLevel : 'Not set';
   };
 
   // 获取目标类型显示文本
   const getGoalTypeDisplay = () => {
     const goalType = profile?.goal_type;
-    console.log('Goal type from profile:', goalType);
+    console.log('Goal type from profile:', goalType, 'Type:', typeof goalType);
     return goalType ? GOAL_TYPE_LABELS[goalType] || goalType : 'Not set';
   };
 
   // 获取每周目标显示文本
   const getWeeklyGoalDisplay = () => {
     const weeklyGoal = profile?.weeklyGoal || profile?.weekly_goal;
-    console.log('Weekly goal from profile:', weeklyGoal);
+    console.log('Weekly goal from profile:', weeklyGoal, 'Type:', typeof weeklyGoal);
     if (!weeklyGoal) return 'Not set';
     
     const direction = weeklyGoal > 0 ? 'Gain' : 'Lose';
@@ -474,11 +474,18 @@ export default function ProfileScreen() {
               </Text>
             </View>
             
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Sample Fields</Text>
+              <Text style={styles.debugValue}>
+                sex: {profile?.sex}, goal_type: {profile?.goal_type}
+              </Text>
+            </View>
+            
             {debugInfo && (
               <View style={styles.debugDataContainer}>
                 <Text style={styles.debugDataTitle}>Raw Profile Data:</Text>
                 <Text style={styles.debugDataText}>
-                  {JSON.stringify(debugInfo, null, 2)}
+                  {JSON.stringify(debugInfo, null, 2).substring(0, 500)}...
                 </Text>
               </View>
             )}

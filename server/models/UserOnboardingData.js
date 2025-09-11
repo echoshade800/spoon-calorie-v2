@@ -13,9 +13,9 @@ export class UserOnboardingData {
         // 解析 JSON 字段
         return {
           ...data,
-          goals: data.goals ? JSON.parse(data.goals) : [],
-          barriers: data.barriers ? JSON.parse(data.barriers) : [],
-          healthy_habits: data.healthy_habits ? JSON.parse(data.healthy_habits) : [],
+          goals: data.goals ? this.safeJsonParse(data.goals) : [],
+          barriers: data.barriers ? this.safeJsonParse(data.barriers) : [],
+          healthy_habits: data.healthy_habits ? this.safeJsonParse(data.healthy_habits) : [],
         };
       }
       return null;
@@ -25,14 +25,55 @@ export class UserOnboardingData {
     }
   }
 
+  static safeJsonParse(jsonString) {
+    try {
+      // 如果已经是数组，直接返回
+      if (Array.isArray(jsonString)) {
+        return jsonString;
+      }
+      
+      // 如果是字符串，尝试解析
+      if (typeof jsonString === 'string') {
+        // 处理可能的格式问题
+        let cleanString = jsonString.trim();
+        
+        // 如果不是以 [ 开头，可能是逗号分隔的字符串
+        if (!cleanString.startsWith('[') && !cleanString.startsWith('{')) {
+          // 将逗号分隔的字符串转换为数组
+          const items = cleanString.split(',').map(item => item.trim().replace(/['"]/g, ''));
+          return items.filter(item => item.length > 0);
+        }
+        
+        return JSON.parse(cleanString);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('JSON解析失败:', error, '原始数据:', jsonString);
+      
+      // 如果解析失败，尝试作为逗号分隔的字符串处理
+      if (typeof jsonString === 'string') {
+        try {
+          const items = jsonString.split(',').map(item => item.trim().replace(/['"]/g, ''));
+          return items.filter(item => item.length > 0);
+        } catch (fallbackError) {
+          console.error('备用解析也失败:', fallbackError);
+          return [];
+        }
+      }
+      
+      return [];
+    }
+  }
+
   static async create(userUid, onboardingData) {
     try {
       const escapedUid = userUid.replace(/'/g, "''");
       
       // 转义和序列化 JSON 字段
-      const goalsJson = onboardingData.goals ? JSON.stringify(onboardingData.goals).replace(/'/g, "''") : 'NULL';
-      const barriersJson = onboardingData.barriers ? JSON.stringify(onboardingData.barriers).replace(/'/g, "''") : 'NULL';
-      const healthyHabitsJson = onboardingData.healthyHabits ? JSON.stringify(onboardingData.healthyHabits).replace(/'/g, "''") : 'NULL';
+      const goalsJson = onboardingData.goals ? JSON.stringify(onboardingData.goals).replace(/'/g, "\\'") : 'NULL';
+      const barriersJson = onboardingData.barriers ? JSON.stringify(onboardingData.barriers).replace(/'/g, "\\'") : 'NULL';
+      const healthyHabitsJson = onboardingData.healthyHabits ? JSON.stringify(onboardingData.healthyHabits).replace(/'/g, "\\'") : 'NULL';
       
       const sql = `
         INSERT INTO user_onboarding_data (
@@ -72,17 +113,17 @@ export class UserOnboardingData {
       const setClause = [];
       
       if (updates.goals !== undefined) {
-        const goalsJson = JSON.stringify(updates.goals).replace(/'/g, "''");
+        const goalsJson = JSON.stringify(updates.goals).replace(/'/g, "\\'");
         setClause.push(`goals = '${goalsJson}'`);
       }
       
       if (updates.barriers !== undefined) {
-        const barriersJson = JSON.stringify(updates.barriers).replace(/'/g, "''");
+        const barriersJson = JSON.stringify(updates.barriers).replace(/'/g, "\\'");
         setClause.push(`barriers = '${barriersJson}'`);
       }
       
       if (updates.healthyHabits !== undefined) {
-        const healthyHabitsJson = JSON.stringify(updates.healthyHabits).replace(/'/g, "''");
+        const healthyHabitsJson = JSON.stringify(updates.healthyHabits).replace(/'/g, "\\'");
         setClause.push(`healthy_habits = '${healthyHabitsJson}'`);
       }
       
