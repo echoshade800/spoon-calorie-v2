@@ -745,6 +745,49 @@ export default function ProfileScreen() {
         )}
 
         {/* App Settings Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Settings</Text>
+          
+          <TouchableOpacity 
+            style={styles.settingRow}
+            onPress={() => router.push('/reminders')}
+          >
+            <View style={styles.settingContent}>
+              <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Reminders & Notifications</Text>
+                <Text style={styles.settingDescription}>Meal reminders and alerts</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.settingRow}>
+            <View style={styles.settingContent}>
+              <Ionicons name="shield-outline" size={24} color="#4CAF50" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Privacy & Data</Text>
+                <Text style={styles.settingDescription}>Data export and privacy settings</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.settingRow}
+            onPress={() => router.push('/about')}
+          >
+            <View style={styles.settingContent}>
+              <Ionicons name="information-circle-outline" size={24} color="#4CAF50" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>About & Help</Text>
+                <Text style={styles.settingDescription}>App info, support, and FAQ</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Goals Modal */}
       <CalorieMacroGoalsModal
@@ -850,16 +893,14 @@ const styles = StyleSheet.create({
   profileLabel: {
     fontSize: 16,
     color: '#000',
-    flex: 0,
+    flex: 1,
   },
   profileValue: {
     fontSize: 16,
     fontWeight: '500',
     color: '#666',
     textAlign: 'right',
-    flex: 0,
-    numberOfLines: 1,
-    ellipsizeMode: 'tail',
+    flex: 1,
   },
   profileValueContainer: {
     flexDirection: 'row',
@@ -882,16 +923,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 16,
     color: '#000',
-    flex: 0,
+    flex: 1,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
     color: '#666',
     textAlign: 'right',
-    numberOfLines: 1,
-    ellipsizeMode: 'tail',
-    flex: 0,
   },
   infoValueContainer: {
     flexDirection: 'row',
@@ -941,6 +979,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  
+  // Settings Section
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  settingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: '#666',
   },
   
   // Loading State
