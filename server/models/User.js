@@ -58,7 +58,9 @@ export class User {
       console.log('执行 SQL (创建用户):', sql);
       
       const result = await executeQuery(sql);
-      return { id: result.insertId, ...userData };
+      const r={ id: result.insertId, ...userData };
+      console.log("create user:",r)
+      return r
     } catch (error) {
       console.error('创建用户失败:', error);
       throw error;
@@ -112,7 +114,7 @@ export class User {
       if (!existingUser) {
         console.log('用户不存在，创建新用户:', userData.uid);
         const newUser = await User.create(userData);
-        return { success: true, user: newUser };
+        return newUser;
       }
       
       // 检查是否需要更新
@@ -136,7 +138,7 @@ export class User {
         });
         
         const updatedUser = await User.update(userData.uid, updates);
-        return { success: true, user: updatedUser };
+        return  updatedUser ;
       }
       
       console.log('用户信息无需更新:', userData.uid);
