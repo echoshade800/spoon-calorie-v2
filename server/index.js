@@ -26,7 +26,7 @@ const upload = multer({
 });
 
 // 测试数据库连接
-testConnection();
+await testConnection();
 
 // 初始化数据库表
 const initializeTables = async () => {
