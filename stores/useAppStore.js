@@ -82,8 +82,8 @@ export const useAppStore = create((set, get) => ({
           console.log('从服务器获取到完整用户数据');
           const serverUser = serverResponse.user;
           
-          // 注释掉本地存储保存
-          // await StorageUtils.setUserData(serverUser);
+          // 保存到本地存储
+          await StorageUtils.setUserData(serverUser);
           
           // 更新应用状态
           set({ profile: serverUser, isOnboarded: true });
@@ -157,8 +157,8 @@ export const useAppStore = create((set, get) => ({
       
       if (response.success) {
         console.log('用户数据同步成功');
-        // 注释掉本地存储保存
-        // await StorageUtils.setUserData(response.user);
+        // 保存到本地存储
+        await StorageUtils.setUserData(response.user);
         // 更新应用状态
         set({ profile: response.user, isOnboarded: true });
       } else {
