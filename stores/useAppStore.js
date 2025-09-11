@@ -82,18 +82,6 @@ export const useAppStore = create((set, get) => ({
           console.log('从服务器获取到完整用户数据');
           const serverUser = serverResponse.user;
           
-          // 同时获取新手引导数据
-          try {
-            const onboardingResponse = await API.getUserOnboardingData(localUserData.uid);
-            if (onboardingResponse.success && onboardingResponse.onboardingData) {
-              console.log('获取到新手引导数据:', onboardingResponse.onboardingData);
-              // 合并新手引导数据到用户数据
-              Object.assign(serverUser, onboardingResponse.onboardingData);
-            }
-          } catch (onboardingError) {
-            console.log('获取新手引导数据失败:', onboardingError.message);
-          }
-          
           // 保存到本地存储
           await StorageUtils.setUserData(serverUser);
           
@@ -138,7 +126,8 @@ export const useAppStore = create((set, get) => ({
         finalUid = StorageUtils.generateUID();
         const updatedProfile = { ...profile, uid: finalUid };
         set({ profile: updatedProfile });
-        await StorageUtils.setUserData(updatedProfile);
+        // 注释掉本地存储保存
+        // await StorageUtils.setUserData(updatedProfile);
       }
       
       // 检查是否为完整的用户数据（已完成 onboarding）
