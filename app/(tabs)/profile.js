@@ -759,7 +759,7 @@ export default function ProfileScreen() {
 
       {/* Edit Modal */}
       {renderEditModal()}
-    </View>
+
   );
 }
 
