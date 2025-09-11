@@ -302,6 +302,45 @@ app.get('/api/users/:uid', async (req, res) => {
   }
 });
 
+// 新手引导数据相关接口
+app.get('/api/users/:uid/onboarding', async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const onboardingData = await UserOnboardingData.findByUserUid(uid);
+    
+    if (!onboardingData) {
+      return res.json({ success: true, onboardingData: null });
+    }
+    
+    res.json({ success: true, onboardingData });
+  } catch (error) {
+    console.error('获取新手引导数据失败:', error);
+    res.status(500).json({ error: '获取新手引导数据失败' });
+  }
+});
+
+app.post('/api/users/:uid/onboarding', async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const onboardingData = req.body;
+    
+    console.log('接收到新手引导数据保存请求:', {
+      uid,
+      hasGoals: !!onboardingData.goals,
+      hasBarriers: !!onboardingData.barriers,
+      hasHealthyHabits: !!onboardingData.healthyHabits,
+      goalWeightKg: onboardingData.goal_weight_kg,
+      weeklyGoal: onboardingData.weeklyGoal
+    });
+    
+    const savedData = await UserOnboardingData.createOrUpdate(uid, onboardingData);
+    res.json({ success: true, onboardingData: savedData });
+  } catch (error) {
+    console.error('保存新手引导数据失败:', error);
+    res.status(500).json({ error: '保存新手引导数据失败' });
+  }
+});
+
 // 食物相关接口
 app.get('/api/foods/search', async (req, res) => {
   try {

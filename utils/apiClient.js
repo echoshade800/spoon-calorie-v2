@@ -59,6 +59,15 @@ export const API = {
     return await apiClient.get(`/users/${uid}`);
   },
 
+  // 新手引导数据相关
+  async getUserOnboardingData(uid) {
+    return await apiClient.get(`/users/${uid}/onboarding`);
+  },
+
+  async saveUserOnboardingData(uid, onboardingData) {
+    return await apiClient.post(`/users/${uid}/onboarding`, onboardingData);
+  },
+
   // 食物相关
   async searchFoods(query, limit = 20) {
     return await apiClient.get('/foods/search', {
