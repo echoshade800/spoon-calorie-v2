@@ -33,9 +33,9 @@ export class Food {
         
         console.log('执行 SQL (搜索):', sql);
         
-        const foods = await executeQuery(sql);
+        let foods = await executeQuery(sql);
         console.log('查询结果数量:', foods?.length || 0);
-        return foods || [];
+       
         // 如果本地数据库没有找到结果，尝试从FatSecret获取
         if (!foods || foods.length === 0) {
           console.log('本地数据库无结果，尝试FatSecret搜索...');
@@ -60,14 +60,15 @@ export class Food {
                 }
               }
               
-              return savedFoods;
+              // return savedFoods;
+              foods=savedFoods
             }
           } catch (fatSecretError) {
             console.error('FatSecret搜索失败:', fatSecretError);
             // FatSecret失败时返回空数组，不影响用户体验
           }
         }
-        
+        return foods || [];
       }
     } catch (error) {
       console.error('搜索食物失败:', error);
