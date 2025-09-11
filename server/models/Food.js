@@ -1,34 +1,22 @@
 import { executeQuery } from '../config/database.js';
-import { fatSecretService } from '../services/fatSecretService.js';
 
 export class Food {
   static async search(query, limit = 20) {
     try {
+      let sql;
+      
       if (!query || query.trim().length === 0) {
-        // 无搜索词时返回本地热门食物
-        const sql = `SELECT * FROM foods WHERE source IN ('USDA', 'OFF') ORDER BY name ASC LIMIT ${limit}`;
+        // 返回热门食物 - 使用直接字符串拼接
+        sql = `SELECT * FROM foods WHERE source IN ('USDA', 'OFF') ORDER BY name ASC LIMIT ${limit}`;
         console.log('执行 SQL (默认):', sql);
         
         const foods = await executeQuery(sql);
         console.log('查询结果数量:', foods?.length || 0);
         return foods || [];
       } else {
-        // 有搜索词时优先使用 FatSecret API
-        try {
-          console.log('使用 FatSecret 搜索食物...');
-          const fatSecretFoods = await fatSecretService.searchFoods(query, limit);
-          
-          if (fatSecretFoods && fatSecretFoods.length > 0) {
-            console.log(`FatSecret 返回 ${fatSecretFoods.length} 条结果`);
-            return fatSecretFoods;
-          }
-        } catch (fatSecretError) {
-          console.warn('FatSecret 搜索失败，回退到本地数据库:', fatSecretError.message);
-        }
-        
-        // FatSecret 失败时回退到本地数据库搜索
-        const searchTerm = query.toLowerCase().replace(/'/g, "''");
-        const sql = `
+        // 搜索查询 - 使用直接字符串拼接避免参数问题
+        const searchTerm = query.toLowerCase().replace(/'/g, "''"); // 转义单引号
+        sql = `
           SELECT * FROM foods 
           WHERE (LOWER(name) LIKE '%${searchTerm}%' OR LOWER(brand) LIKE '%${searchTerm}%' OR barcode = '${searchTerm}')
           ORDER BY 
@@ -42,9 +30,10 @@ export class Food {
           LIMIT ${limit}
         `;
         
-        console.log('执行 SQL (本地搜索):', sql);
+        console.log('执行 SQL (搜索):', sql);
+        
         const foods = await executeQuery(sql);
-        console.log('本地查询结果数量:', foods?.length || 0);
+        console.log('查询结果数量:', foods?.length || 0);
         return foods || [];
       }
     } catch (error) {
@@ -55,20 +44,6 @@ export class Food {
 
   static async findById(id) {
     try {
-      // 检查是否为 FatSecret 食物
-      if (id.startsWith('fatsecret_')) {
-        const fatSecretId = id.replace('fatsecret_', '');
-        try {
-          const fatSecretFood = await fatSecretService.getFoodById(fatSecretId);
-          if (fatSecretFood) {
-            return fatSecretFood;
-          }
-        } catch (fatSecretError) {
-          console.warn('FatSecret 获取食物详情失败:', fatSecretError.message);
-        }
-      }
-      
-      // 本地数据库查找
       // 转义 ID 中的单引号
       const escapedId = id.replace(/'/g, "''");
       const sql = `SELECT * FROM foods WHERE id = '${escapedId}'`;
