@@ -770,6 +770,18 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+
+        {/* How We Make Recommendations Entry Point */}
+        <View style={styles.recommendationsSection}>
+          <TouchableOpacity 
+            style={styles.recommendationsButton}
+            onPress={() => router.push('/recommendations')}
+          >
+            <Text style={styles.recommendationsText}>
+              ℹ️ How we make recommendations
+            </Text>
+          </TouchableOpacity>
+        </View>
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -1046,5 +1058,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  
+  // Recommendations Section
+  recommendationsSection: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  recommendationsButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  recommendationsText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    textAlign: 'center',
   },
 });
