@@ -231,8 +231,41 @@ app.post('/api/users/sync', async (req, res) => {
       return res.status(400).json({ error: '缺少用户 UID' });
     }
     
+    console.log('接收到用户同步请求:', {
+      uid: userData.uid,
+      hasGoals: !!userData.goals,
+      hasBarriers: !!userData.barriers,
+      hasHealthyHabits: !!userData.healthyHabits,
+      mealPlanning: userData.mealPlanning,
+      weeklyGoal: userData.weeklyGoal
+    });
+    
     const user = await User.createOrUpdate(userData);
-    res.json({ success: true, user });
+    
+    // 获取完整的用户数据（包含新手引导数据）
+    const completeUserData = await User.findByUid(userData.uid);
+    let onboardingData = null;
+    
+    try {
+      onboardingData = await UserOnboardingData.findByUserUid(userData.uid);
+    } catch (error) {
+      console.warn('获取新手引导数据失败:', error);
+    }
+    
+    // 合并用户数据和新手引导数据
+    const finalUserData = {
+      ...completeUserData,
+      ...(onboardingData || {})
+    };
+    
+    console.log('返回完整用户数据:', {
+      uid: finalUserData.uid,
+      hasGoals: !!finalUserData.goals,
+      hasBarriers: !!finalUserData.barriers,
+      hasHealthyHabits: !!finalUserData.healthyHabits || !!finalUserData.healthy_habits
+    });
+    
+    res.json({ success: true, user: finalUserData });
   } catch (error) {
     console.error('用户同步失败:', error);
     res.status(500).json({ error: '用户同步失败' });

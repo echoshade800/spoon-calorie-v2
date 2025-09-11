@@ -182,11 +182,11 @@ export class User {
           }
         }
         
-        return  updatedUser ;
+        return updatedUser;
       }
       
       console.log('用户信息无需更新:', userData.uid);
-      return { success: true, user: existingUser };
+      return existingUser;
     } catch (error) {
       console.error('创建或更新用户失败:', error);
       throw error;
