@@ -712,7 +712,7 @@ export default function ProfileScreen() {
                 <Text style={styles.preferenceValue}>
                   {Array.isArray(profile.barriers) ? profile.barriers.join(', ') : 'Not set'}
                 </Text>
-             
+           
             )}
             
             {(profile?.healthyHabits || profile?.healthy_habits) && ((profile?.healthyHabits?.length > 0) || (profile?.healthy_habits?.length > 0)) && (
