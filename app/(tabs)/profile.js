@@ -893,14 +893,14 @@ const styles = StyleSheet.create({
   profileLabel: {
     fontSize: 16,
     color: '#000',
-    flex: 1,
+    flex: 0,
   },
   profileValue: {
     fontSize: 16,
     fontWeight: '500',
     color: '#666',
     textAlign: 'right',
-    flex: 1,
+    flex: 0,
     numberOfLines: 1,
     ellipsizeMode: 'tail',
   },
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 16,
     color: '#000',
-    flex: 1,
+    flex: 0,
   },
   infoValue: {
     fontSize: 16,
@@ -934,7 +934,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     numberOfLines: 1,
     ellipsizeMode: 'tail',
-    flex: 1,
+    flex: 0,
   },
   infoValueContainer: {
     flexDirection: 'row',
