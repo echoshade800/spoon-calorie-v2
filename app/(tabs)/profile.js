@@ -901,6 +901,8 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'right',
     flex: 1,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
   },
   profileValueContainer: {
     flexDirection: 'row',
@@ -930,6 +932,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#666',
     textAlign: 'right',
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
+    flex: 1,
   },
   infoValueContainer: {
     flexDirection: 'row',
