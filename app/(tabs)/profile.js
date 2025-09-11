@@ -47,6 +47,7 @@ export default function ProfileScreen() {
 
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   // 加载用户数据
   useEffect(() => {
@@ -62,6 +63,11 @@ export default function ProfileScreen() {
       
       // 尝试从服务器同步最新数据
       await syncUserData();
+      
+      // 获取当前profile数据用于调试
+      const currentProfile = get().profile;
+      setDebugInfo(currentProfile);
+      console.log('当前Profile数据:', currentProfile);
       
       console.log('Profile数据加载完成');
     } catch (error) {
@@ -111,7 +117,12 @@ export default function ProfileScreen() {
   };
 
   const getWeightProgress = () => {
-    if (!profile?.weight_kg || !profile?.goal_weight_kg) return null;
+    // 检查多个可能的字段名
+    const currentWeight = profile?.weight_kg;
+    const goalWeight = profile?.goal_weight_kg;
+    
+    if (!currentWeight || !goalWeight) return null;
+    
     const current = profile.weight_kg;
     const goal = profile.goal_weight_kg;
     const difference = Math.abs(goal - current);
@@ -119,6 +130,36 @@ export default function ProfileScreen() {
     return { difference: difference.toFixed(1), direction };
   };
 
+  // 调试函数：获取实际的字段值
+  const getFieldValue = (fieldName, fallback = 'Not set') => {
+    const value = profile?.[fieldName];
+    console.log(`字段 ${fieldName}:`, value);
+    return value || fallback;
+  };
+
+  // 获取活动水平显示文本
+  const getActivityLevelDisplay = () => {
+    const activityLevel = profile?.activity_level;
+    console.log('Activity level from profile:', activityLevel);
+    return activityLevel ? ACTIVITY_LEVEL_LABELS[activityLevel] || activityLevel : 'Not set';
+  };
+
+  // 获取目标类型显示文本
+  const getGoalTypeDisplay = () => {
+    const goalType = profile?.goal_type;
+    console.log('Goal type from profile:', goalType);
+    return goalType ? GOAL_TYPE_LABELS[goalType] || goalType : 'Not set';
+  };
+
+  // 获取每周目标显示文本
+  const getWeeklyGoalDisplay = () => {
+    const weeklyGoal = profile?.weeklyGoal || profile?.weekly_goal;
+    console.log('Weekly goal from profile:', weeklyGoal);
+    if (!weeklyGoal) return 'Not set';
+    
+    const direction = weeklyGoal > 0 ? 'Gain' : 'Lose';
+    return `${direction} ${Math.abs(weeklyGoal)} lb/week`;
+  };
   if (!profile) {
     return (
       <View style={styles.container}>
@@ -169,28 +210,28 @@ export default function ProfileScreen() {
         <View style={styles.goalsGrid}>
           <View style={styles.goalCard}>
             <Text style={styles.goalValue}>
-              {profile.calorie_goal ? formatCalories(profile.calorie_goal) : '-'}
+              {getFieldValue('calorie_goal') !== 'Not set' ? formatCalories(profile.calorie_goal) : '-'}
             </Text>
             <Text style={styles.goalLabel}>Calories</Text>
           </View>
           
           <View style={styles.goalCard}>
             <Text style={styles.goalValue}>
-              {profile.macro_c ? `${profile.macro_c}%` : '-'}
+              {getFieldValue('macro_c') !== 'Not set' ? `${profile.macro_c}%` : '-'}
             </Text>
             <Text style={styles.goalLabel}>Carbs</Text>
           </View>
           
           <View style={styles.goalCard}>
             <Text style={styles.goalValue}>
-              {profile.macro_p ? `${profile.macro_p}%` : '-'}
+              {getFieldValue('macro_p') !== 'Not set' ? `${profile.macro_p}%` : '-'}
             </Text>
             <Text style={styles.goalLabel}>Protein</Text>
           </View>
           
           <View style={styles.goalCard}>
             <Text style={styles.goalValue}>
-              {profile.macro_f ? `${profile.macro_f}%` : '-'}
+              {getFieldValue('macro_f') !== 'Not set' ? `${profile.macro_f}%` : '-'}
             </Text>
             <Text style={styles.goalLabel}>Fat</Text>
           </View>
@@ -205,24 +246,21 @@ export default function ProfileScreen() {
           <View style={styles.profileRow}>
             <Text style={styles.profileLabel}>Goal</Text>
             <Text style={styles.profileValue}>
-              {profile.goal_type ? GOAL_TYPE_LABELS[profile.goal_type] : 'Not set'}
+              {getGoalTypeDisplay()}
             </Text>
           </View>
           
           <View style={styles.profileRow}>
             <Text style={styles.profileLabel}>Activity Level</Text>
             <Text style={styles.profileValue}>
-              {profile.activity_level ? ACTIVITY_LEVEL_LABELS[profile.activity_level] : 'Not set'}
+              {getActivityLevelDisplay()}
             </Text>
           </View>
           
           <View style={styles.profileRow}>
             <Text style={styles.profileLabel}>Weekly Goal</Text>
             <Text style={styles.profileValue}>
-              {profile.weeklyGoal ? 
-                `${profile.weeklyGoal > 0 ? 'Gain' : 'Lose'} ${Math.abs(profile.weeklyGoal)} lb/week` : 
-                'Not set'
-              }
+              {getWeeklyGoalDisplay()}
             </Text>
           </View>
           
@@ -245,35 +283,35 @@ export default function ProfileScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Sex</Text>
             <Text style={styles.infoValue}>
-              {profile.sex ? profile.sex.charAt(0).toUpperCase() + profile.sex.slice(1) : 'Not set'}
+              {getFieldValue('sex') !== 'Not set' ? profile.sex.charAt(0).toUpperCase() + profile.sex.slice(1) : 'Not set'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Age</Text>
             <Text style={styles.infoValue}>
-              {profile.age ? `${profile.age} years` : 'Not set'}
+              {getFieldValue('age') !== 'Not set' ? `${profile.age} years` : 'Not set'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Height</Text>
             <Text style={styles.infoValue}>
-              {profile.height_cm ? `${profile.height_cm} cm` : 'Not set'}
+              {getFieldValue('height_cm') !== 'Not set' ? `${profile.height_cm} cm` : 'Not set'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Current Weight</Text>
             <Text style={styles.infoValue}>
-              {profile.weight_kg ? `${profile.weight_kg} kg` : 'Not set'}
+              {getFieldValue('weight_kg') !== 'Not set' ? `${profile.weight_kg} kg` : 'Not set'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Goal Weight</Text>
             <Text style={styles.infoValue}>
-              {profile.goal_weight_kg ? `${profile.goal_weight_kg} kg` : 'Not set'}
+              {getFieldValue('goal_weight_kg') !== 'Not set' ? `${profile.goal_weight_kg} kg` : 'Not set'}
             </Text>
           </View>
           
@@ -296,7 +334,7 @@ export default function ProfileScreen() {
           <View style={styles.metabolismRow}>
             <Text style={styles.metabolismLabel}>BMR (Base Metabolic Rate)</Text>
             <Text style={styles.metabolismValue}>
-              {profile.bmr ? `${formatCalories(profile.bmr)} kcal/day` : 'Not calculated'}
+              {getFieldValue('bmr') !== 'Not set' ? `${formatCalories(profile.bmr)} kcal/day` : 'Not calculated'}
             </Text>
             <Text style={styles.metabolismDescription}>
               Calories burned at rest
@@ -306,7 +344,7 @@ export default function ProfileScreen() {
           <View style={styles.metabolismRow}>
             <Text style={styles.metabolismLabel}>TDEE (Total Daily Energy Expenditure)</Text>
             <Text style={styles.metabolismValue}>
-              {profile.tdee ? `${formatCalories(profile.tdee)} kcal/day` : 'Not calculated'}
+              {getFieldValue('tdee') !== 'Not set' ? `${formatCalories(profile.tdee)} kcal/day` : 'Not calculated'}
             </Text>
             <Text style={styles.metabolismDescription}>
               BMR + activity level
@@ -316,43 +354,51 @@ export default function ProfileScreen() {
       </View>
 
       {/* Onboarding Data Section */}
-      {(profile.goals || profile.barriers || profile.healthyHabits) && (
+      {(profile?.goals || profile?.barriers || profile?.healthyHabits || profile?.healthy_habits) && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Preferences</Text>
           
-          {profile.goals && profile.goals.length > 0 && (
+          {(profile?.goals || profile?.goals) && (profile?.goals?.length > 0) && (
             <View style={styles.preferenceRow}>
               <Text style={styles.preferenceLabel}>Goals</Text>
               <Text style={styles.preferenceValue}>
-                {profile.goals.join(', ')}
+                {Array.isArray(profile.goals) ? profile.goals.join(', ') : 'Not set'}
               </Text>
             </View>
           )}
           
-          {profile.barriers && profile.barriers.length > 0 && (
+          {(profile?.barriers) && (profile?.barriers?.length > 0) && (
             <View style={styles.preferenceRow}>
               <Text style={styles.preferenceLabel}>Past Barriers</Text>
               <Text style={styles.preferenceValue}>
-                {profile.barriers.join(', ')}
+                {Array.isArray(profile.barriers) ? profile.barriers.join(', ') : 'Not set'}
               </Text>
             </View>
           )}
           
-          {profile.healthyHabits && profile.healthyHabits.length > 0 && (
+          {(profile?.healthyHabits || profile?.healthy_habits) && ((profile?.healthyHabits?.length > 0) || (profile?.healthy_habits?.length > 0)) && (
             <View style={styles.preferenceRow}>
               <Text style={styles.preferenceLabel}>Healthy Habits</Text>
               <Text style={styles.preferenceValue}>
-                {profile.healthyHabits.slice(0, 3).join(', ')}
-                {profile.healthyHabits.length > 3 && ` +${profile.healthyHabits.length - 3} more`}
+                {(() => {
+                  const habits = profile.healthyHabits || profile.healthy_habits || [];
+                  if (!Array.isArray(habits) || habits.length === 0) return 'Not set';
+                  const displayHabits = habits.slice(0, 3).join(', ');
+                  const moreCount = habits.length > 3 ? ` +${habits.length - 3} more` : '';
+                  return displayHabits + moreCount;
+                })()}
               </Text>
             </View>
           )}
           
-          {profile.mealPlanning && (
+          {(profile?.mealPlanning || profile?.meal_planning) && (
             <View style={styles.preferenceRow}>
               <Text style={styles.preferenceLabel}>Meal Planning</Text>
               <Text style={styles.preferenceValue}>
-                {profile.mealPlanning.charAt(0).toUpperCase() + profile.mealPlanning.slice(1)}
+                {(() => {
+                  const mealPlanning = profile.mealPlanning || profile.meal_planning;
+                  return mealPlanning ? mealPlanning.charAt(0).toUpperCase() + mealPlanning.slice(1) : 'Not set';
+                })()}
               </Text>
             </View>
           )}
@@ -404,7 +450,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Debug Section (only show if profile has UID) */}
-      {profile.uid && (
+      {profile?.uid && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Debug Info</Text>
           
@@ -417,9 +463,25 @@ export default function ProfileScreen() {
             <View style={styles.debugRow}>
               <Text style={styles.debugLabel}>Data Source</Text>
               <Text style={styles.debugValue}>
-                {profile.created_at ? 'Server' : 'Local'}
+                {profile?.created_at ? 'Server' : 'Local'}
               </Text>
             </View>
+            
+            <View style={styles.debugRow}>
+              <Text style={styles.debugLabel}>Profile Keys</Text>
+              <Text style={styles.debugValue}>
+                {profile ? Object.keys(profile).length : 0} fields
+              </Text>
+            </View>
+            
+            {debugInfo && (
+              <View style={styles.debugDataContainer}>
+                <Text style={styles.debugDataTitle}>Raw Profile Data:</Text>
+                <Text style={styles.debugDataText}>
+                  {JSON.stringify(debugInfo, null, 2)}
+                </Text>
+              </View>
+            )}
             
             <TouchableOpacity 
               style={styles.debugButton}
@@ -670,6 +732,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#4CAF50',
+  },
+  debugDataContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  debugDataTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  debugDataText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
+    lineHeight: 16,
   },
   
   // Loading State
