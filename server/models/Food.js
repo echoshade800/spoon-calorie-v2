@@ -1,4 +1,5 @@
 import { executeQuery } from '../config/database.js';
+import { FatSecretService } from '../services/fatSecretService.js';
 
 export class Food {
   static async search(query, limit = 20) {
@@ -35,6 +36,38 @@ export class Food {
         const foods = await executeQuery(sql);
         console.log('查询结果数量:', foods?.length || 0);
         return foods || [];
+        // 如果本地数据库没有找到结果，尝试从FatSecret获取
+        if (!foods || foods.length === 0) {
+          console.log('本地数据库无结果，尝试FatSecret搜索...');
+          
+          try {
+            const fatSecretFoods = await FatSecretService.searchFoods(query, Math.min(limit, 5));
+            
+            if (fatSecretFoods && fatSecretFoods.length > 0) {
+              console.log(`FatSecret找到 ${fatSecretFoods.length} 个食品，准备存储到数据库`);
+              
+              // 将FatSecret食品存储到本地数据库
+              const savedFoods = [];
+              for (const food of fatSecretFoods) {
+                try {
+                  const savedFood = await Food.create(food);
+                  savedFoods.push(savedFood);
+                  console.log(`已保存FatSecret食品: ${food.name}`);
+                } catch (saveError) {
+                  console.error(`保存FatSecret食品失败: ${food.name}`, saveError);
+                  // 即使保存失败，也返回食品数据供前端使用
+                  savedFoods.push(food);
+                }
+              }
+              
+              return savedFoods;
+            }
+          } catch (fatSecretError) {
+            console.error('FatSecret搜索失败:', fatSecretError);
+            // FatSecret失败时返回空数组，不影响用户体验
+          }
+        }
+        
       }
     } catch (error) {
       console.error('搜索食物失败:', error);
@@ -73,7 +106,7 @@ export class Food {
         sodium_per_100g: foodData.sodium_per_100g || 0,
         serving_label: foodData.serving_label ? foodData.serving_label.replace(/'/g, "''") : null,
         grams_per_serving: foodData.grams_per_serving || null,
-        source: foodData.source.replace(/'/g, "''"),
+        source: (foodData.source || 'CUSTOM').replace(/'/g, "''"),
         barcode: foodData.barcode ? foodData.barcode.replace(/'/g, "''") : null,
         category: foodData.category ? foodData.category.replace(/'/g, "''") : null
       };

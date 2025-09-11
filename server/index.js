@@ -85,6 +85,11 @@ const initializeTables = async () => {
       )
     `);
     
+    // 更新foods表，添加FATSECRET作为新的source选项
+    await executeQuery(`
+      ALTER TABLE foods MODIFY COLUMN source ENUM('USDA', 'OFF', 'CUSTOM', 'FATSECRET') NOT NULL
+    `);
+    
     // 创建日记条目表
     await executeQuery(`
       CREATE TABLE IF NOT EXISTS diary_entries (
