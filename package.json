@@ -9,6 +9,7 @@
     "server": "node server/index.js",
     "dev:full": "npm run server & npm run dev",
     "start": "EXPO_NO_TELEMETRY=1 expo start --reset-cache",
+    "build": "expo export",
     "build:web": "expo export --platform web",
     "build:android": "expo build:android",
     "build:ios": "expo build:ios",
@@ -19,6 +20,7 @@
     "@expo/vector-icons": "^14.1.0",
     "@lucide/lab": "^0.1.2",
     "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/cli": "^20.0.2",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "axios": "^1.7.9",
@@ -41,8 +43,8 @@
     "expo-symbols": "~0.4.3",
     "expo-system-ui": "~5.0.5",
     "expo-web-browser": "~14.2.0",
-    "lucide-react-native": "^0.475.0",
     "fatsecret": "github:ldgoooo/fatsecret",
+    "lucide-react-native": "^0.475.0",
     "metro": "^0.82.5",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -65,6 +67,8 @@
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.12.0",
     "typescript": "~5.8.3",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "@react-native-community/cli": "latest",
+    "babel-plugin-module-resolver": "^5.0.2"
   }
 }
