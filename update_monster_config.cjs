@@ -72,7 +72,7 @@ function updateJsonData(data, targetName, targetModuleName, newHost) {
             module_name: targetModuleName.replace(/\s+/g, ''), // 简单处理为去掉空格的name
             category: "lifestyle", // 默认分类
             image: "", // 空图片
-            releaseUrl: releaseUrl // 空发布地址
+            releaseUrl: newHost // 空发布地址
         };
         
         data.push(newItem);
