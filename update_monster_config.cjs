@@ -55,7 +55,8 @@ function updateJsonData(data, targetName, targetModuleName, newHost) {
     
     if (index !== -1) {
         // 找到匹配项，更新host
-        data[index].host = newHost;
+        data[index].releaseUrl = newHost;
+        // data[index].category = "lifestyle";
         console.log(`已更新 "${targetName}" 的host为: ${newHost}`);
     } else {
         // 未找到匹配项，添加新项
@@ -69,9 +70,9 @@ function updateJsonData(data, targetName, targetModuleName, newHost) {
             miniAppType: "RN", // 默认类型
             host: newHost,
             module_name: targetModuleName.replace(/\s+/g, ''), // 简单处理为去掉空格的name
-            category: "default", // 默认分类
+            category: "lifestyle", // 默认分类
             image: "", // 空图片
-            releaseUrl: "" // 空发布地址
+            releaseUrl: releaseUrl // 空发布地址
         };
         
         data.push(newItem);
