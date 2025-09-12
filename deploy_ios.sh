@@ -36,3 +36,10 @@ fi
 rm "$ZIP_FILE"
 
 echo "部署成功！版本: https://vsa-bucket-public-new.s3.amazonaws.com/miniapps/${NAME}/ios_${VERSION}.zip"
+
+# 提取名称并赋值给变量
+MODULE_NAME=$(sed -e 's#//.*##' -e ':a' -e '/\/\*/{N;ba' -e '}' -e 's#/\*.*\*/##g' index.tsx | \
+grep "AppRegistry.registerComponent" | \
+sed -n "s/.*registerComponent('\\([^']*\\)'.*/\\1/p")
+
+node update_monster_config.cjs ${NAME} ${MODULE_NAME} https://vsa-bucket-public-new.s3.amazonaws.com/miniapps/${NAME}/ios_${VERSION}.zip
