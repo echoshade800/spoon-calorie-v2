@@ -1,5 +1,5 @@
 {
-  "name": "quickkcal",
+  "name": "CaloTrack",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "type": "module",
