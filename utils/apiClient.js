@@ -74,6 +74,10 @@ export const API = {
     return await apiClient.post('/foods', foodData);
   },
 
+  async getFoodByBarcode(barcode) {
+    return await apiClient.get(`/foods/barcode/${barcode}`);
+  },
+
   // 餐食相关
   async getUserMeals(uid) {
     return await apiClient.get(`/meals/${uid}`);
