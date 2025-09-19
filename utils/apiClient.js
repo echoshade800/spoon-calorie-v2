@@ -2,7 +2,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 
 // API 基础配置
-export const API_BASE_URL = Constants.platform?.OS === 'web' 
+const API_BASE_URL = Constants.platform?.OS === 'web' 
   ? 'http://localhost:3001/api'
   : 'http://54.80.146.38:3001/api'; // Android 模拟器使用 10.0.2.2
 
@@ -72,6 +72,10 @@ export const API = {
 
   async createFood(foodData) {
     return await apiClient.post('/foods', foodData);
+  },
+
+  async getFoodByBarcode(barcode) {
+    return await apiClient.get(`/foods/barcode/${barcode}`);
   },
 
   // 餐食相关
