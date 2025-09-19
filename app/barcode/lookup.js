@@ -18,11 +18,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/useAppStore';
 import Constants from 'expo-constants';
+import {API_BASE_URL} from '@/utils/apiClient';
 
 // API 基础配置
-const API_BASE_URL = Constants.platform?.OS === 'web' 
-  ? 'http://localhost:3001/api'
-  : 'http://54.80.146.38:3001/api';
+// const API_BASE_URL = Constants.platform?.OS === 'web' 
+//   ? 'http://localhost:3001/api'
+//   : 'http://54.80.146.38:3001/api';
 
 export default function BarcodeLookupScreen() {
   const router = useRouter();
@@ -82,13 +83,16 @@ export default function BarcodeLookupScreen() {
         
         // 尝试使用FatSecret API查找条形码
         try {
-          const response = await fetch(`${API_BASE_URL}/foods/barcode/${barcode}`, {
+          const barcode_url=`${API_BASE_URL}/foods/barcode/${barcode}`
+          console.log('FatSecret API URL:', barcode_url);
+          const response = await fetch(barcode_url, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
             },
             timeout: 15000,
           });
+          console.log('FatSecret API响应状态:', response.status,response);
           
           const data = await response.json();
           

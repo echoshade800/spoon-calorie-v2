@@ -2,9 +2,9 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 
 // API 基础配置
-const API_BASE_URL = Constants.platform?.OS === 'web' 
+export const API_BASE_URL = Constants.platform?.OS === 'web' 
   ? 'http://localhost:3001/api'
-  : 'http://54.80.146.38:3001/api'; // Android 模拟器使用 10.0.2.2
+  : 'http://192.168.1.111:3001/api'; // Android 模拟器使用 10.0.2.2
 
 // 创建 axios 实例
 const apiClient = axios.create({
