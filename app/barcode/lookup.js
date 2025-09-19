@@ -17,13 +17,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/useAppStore';
-import Constants from 'expo-constants';
-import {API_BASE_URL} from '@/utils/apiClient';
 
-// API 基础配置
-// const API_BASE_URL = Constants.platform?.OS === 'web' 
-//   ? 'http://localhost:3001/api'
-//   : 'http://54.80.146.38:3001/api';
+import { API } from '@/utils/apiClient';
 
 export default function BarcodeLookupScreen() {
   const router = useRouter();
@@ -47,85 +42,36 @@ export default function BarcodeLookupScreen() {
     try {
       setIsLoading(true);
       
-      // 首先尝试在本地数据库中查找条形码
       console.log('开始条形码查找:', barcode);
       
-      // 尝试通过条形码搜索本地数据库
-      const { searchFoodsInDatabase } = useAppStore.getState();
-      const localResults = await searchFoodsInDatabase(barcode);
+      // 调用专门的条形码查找API
+      const response = await API.getFoodByBarcode(barcode);
       
-      // 检查本地是否有匹配的条形码
-      const localMatch = localResults.find(food => food.barcode === barcode);
-      
-      if (localMatch) {
-        console.log('在本地数据库找到条形码匹配:', localMatch.name);
+      if (response.success && response.food) {
+        console.log('找到条形码匹配:', response.food.name);
         setLookupResult({
           matched: true,
-          foodId: localMatch.id,
-          foodName: localMatch.name,
-          brand: localMatch.brand
+          foodId: response.food.id,
+          foodName: response.food.name,
+          brand: response.food.brand,
+          source: response.source
         });
         
         // Navigate to food details with barcode match info
         router.replace({
           pathname: '/food-details',
           params: {
-            foodId: localMatch.id,
+            foodId: response.food.id,
             meal: selectedMeal,
             returnTo: 'add',
             barcodeMatched: 'true',
-            matchedFoodName: localMatch.name,
+            matchedFoodName: response.food.name,
             barcode: barcode,
+            fromFatSecret: response.source === 'fatsecret' ? 'true' : 'false',
           }
         });
       } else {
-        console.log('本地数据库未找到，尝试FatSecret API...');
-        
-        // 尝试使用FatSecret API查找条形码
-        try {
-          const barcode_url=`${API_BASE_URL}/foods/barcode/${barcode}`
-          console.log('FatSecret API URL:', barcode_url);
-          const response = await fetch(barcode_url, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            timeout: 15000,
-          });
-          console.log('FatSecret API响应状态:', response.status,response);
-          
-          const data = await response.json();
-          
-          if (data.success && data.food) {
-            console.log('FatSecret找到条形码匹配:', data.food.name);
-            setLookupResult({
-              matched: true,
-              foodId: data.food.id,
-              foodName: data.food.name,
-              brand: data.food.brand
-            });
-            
-            // Navigate to food details with barcode match info
-            router.replace({
-              pathname: '/food-details',
-              params: {
-                foodId: data.food.id,
-                meal: selectedMeal,
-                returnTo: 'add',
-                barcodeMatched: 'true',
-                matchedFoodName: data.food.name,
-                barcode: barcode,
-                fromFatSecret: 'true',
-              }
-            });
-            return;
-          }
-        } catch (fatSecretError) {
-          console.log('FatSecret API调用失败:', fatSecretError.message);
-        }
-        
-        // 如果本地和FatSecret都没找到，显示无匹配结果
-        console.log('所有数据源都未找到该条形码');
+        console.log('未找到该条形码对应的食品');
         setLookupResult({ matched: false });
         
         router.replace({
@@ -139,7 +85,7 @@ export default function BarcodeLookupScreen() {
     } catch (error) {
       console.error('Barcode lookup error:', error);
       Alert.alert(
-        'Network Error',
+        'Lookup Error',
         'Please try again.',
         [
           { text: 'Retry', onPress: () => performBarcodeLookup() },
