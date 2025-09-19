@@ -17,6 +17,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/stores/useAppStore';
+import Constants from 'expo-constants';
+
+// API 基础配置
+const API_BASE_URL = Constants.platform?.OS === 'web' 
+  ? 'http://localhost:3001/api'
+  : 'http://54.80.146.38:3001/api';
 
 export default function BarcodeLookupScreen() {
   const router = useRouter();
@@ -40,50 +46,84 @@ export default function BarcodeLookupScreen() {
     try {
       setIsLoading(true);
       
-      // Simulate barcode lookup API call
-      // In a real app, this would call a barcode resolution service
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API delay
+      // 首先尝试在本地数据库中查找条形码
+      console.log('开始条形码查找:', barcode);
       
-      // Mock barcode lookup results
-      const mockResults = {
-        '4901777317789': {
-          matched: true,
-          foodId: 'off_4901777317789',
-          foodName: 'Instant Ramen Noodles',
-          brand: 'Nissin'
-        },
-        '8901030865507': {
-          matched: true,
-          foodId: 'off_8901030865507',
-          foodName: 'Coca-Cola',
-          brand: 'The Coca-Cola Company'
-        },
-        '3017620422003': {
-          matched: true,
-          foodId: 'off_3017620422003',
-          foodName: 'Nutella',
-          brand: 'Ferrero'
-        }
-      };
+      // 尝试通过条形码搜索本地数据库
+      const { searchFoodsInDatabase } = useAppStore.getState();
+      const localResults = await searchFoodsInDatabase(barcode);
       
-      const result = mockResults[barcode] || { matched: false };
-      setLookupResult(result);
+      // 检查本地是否有匹配的条形码
+      const localMatch = localResults.find(food => food.barcode === barcode);
       
-      if (result.matched) {
+      if (localMatch) {
+        console.log('在本地数据库找到条形码匹配:', localMatch.name);
+        setLookupResult({
+          matched: true,
+          foodId: localMatch.id,
+          foodName: localMatch.name,
+          brand: localMatch.brand
+        });
+        
         // Navigate to food details with barcode match info
         router.replace({
           pathname: '/food-details',
           params: {
-            foodId: result.foodId,
+            foodId: localMatch.id,
             meal: selectedMeal,
             returnTo: 'add',
             barcodeMatched: 'true',
-            matchedFoodName: result.foodName,
+            matchedFoodName: localMatch.name,
             barcode: barcode,
           }
         });
       } else {
-        // Navigate to no match results
+        console.log('本地数据库未找到，尝试FatSecret API...');
+        
+        // 尝试使用FatSecret API查找条形码
+        try {
+          const response = await fetch(`${API_BASE_URL}/foods/barcode/${barcode}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 15000,
+          });
+          
+          const data = await response.json();
+          
+          if (data.success && data.food) {
+            console.log('FatSecret找到条形码匹配:', data.food.name);
+            setLookupResult({
+              matched: true,
+              foodId: data.food.id,
+              foodName: data.food.name,
+              brand: data.food.brand
+            });
+            
+            // Navigate to food details with barcode match info
+            router.replace({
+              pathname: '/food-details',
+              params: {
+                foodId: data.food.id,
+                meal: selectedMeal,
+                returnTo: 'add',
+                barcodeMatched: 'true',
+                matchedFoodName: data.food.name,
+                barcode: barcode,
+                fromFatSecret: 'true',
+              }
+            });
+            return;
+          }
+        } catch (fatSecretError) {
+          console.log('FatSecret API调用失败:', fatSecretError.message);
+        }
+        
+        // 如果本地和FatSecret都没找到，显示无匹配结果
+        console.log('所有数据源都未找到该条形码');
+        setLookupResult({ matched: false });
+        
         router.replace({
           pathname: '/barcode/results',
           params: {

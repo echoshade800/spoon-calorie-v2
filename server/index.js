@@ -9,6 +9,7 @@ import { DiaryEntry } from './models/DiaryEntry.js';
 import { ExerciseEntry } from './models/ExerciseEntry.js';
 import { UserOnboardingData } from './models/UserOnboardingData.js';
 import { OpenAIService } from './services/openaiService.js';
+import { FatSecretService } from './services/fatSecretService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -343,6 +344,53 @@ app.post('/api/foods', async (req, res) => {
   } catch (error) {
     console.error('创建食物失败:', error);
     res.status(500).json({ error: '创建食物失败' });
+  }
+});
+
+// 条形码查找接口
+app.get('/api/foods/barcode/:barcode', async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    
+    if (!barcode) {
+      return res.status(400).json({ error: '条形码参数缺失' });
+    }
+    
+    console.log('开始条形码查找:', barcode);
+    
+    // 首先在本地数据库中查找
+    const localFood = await Food.findByBarcode(barcode);
+    
+    if (localFood) {
+      console.log('在本地数据库找到条形码匹配:', localFood.name);
+      return res.json({ success: true, food: localFood, source: 'local' });
+    }
+    
+    // 本地未找到，尝试FatSecret
+    console.log('本地未找到，尝试FatSecret...');
+    const fatSecretFood = await FatSecretService.getFoodByBarcode(barcode);
+    
+    if (fatSecretFood) {
+      console.log('FatSecret找到匹配，准备保存到数据库:', fatSecretFood.name);
+      
+      // 保存到本地数据库
+      try {
+        const savedFood = await Food.create(fatSecretFood);
+        console.log('FatSecret食品已保存到数据库:', savedFood.name);
+        return res.json({ success: true, food: savedFood, source: 'fatsecret' });
+      } catch (saveError) {
+        console.error('保存FatSecret食品失败:', saveError);
+        // 即使保存失败，也返回食品数据
+        return res.json({ success: true, food: fatSecretFood, source: 'fatsecret' });
+      }
+    }
+    
+    // 所有数据源都未找到
+    console.log('所有数据源都未找到该条形码');
+    res.json({ success: false, message: '未找到该条形码对应的食品' });
+  } catch (error) {
+    console.error('条形码查找失败:', error);
+    res.status(500).json({ error: '条形码查找失败' });
   }
 });
 

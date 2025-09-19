@@ -40,6 +40,46 @@ export class FatSecretService {
   }
   
   /**
+   * 通过条形码获取食品信息
+   */
+  static async getFoodByBarcode(barcode) {
+    try {
+      console.log(`FatSecret条形码搜索: ${barcode}`);
+      
+      // 第一步：通过条形码查找food_id
+      const foodRes = await fatAPI.method("food.find_id_for_barcode", {
+        barcode: barcode,
+      });
+      
+      const { food_id } = foodRes;
+      if (!food_id) {
+        console.log('FatSecret未找到该条形码对应的食品');
+        return null;
+      }
+      
+      console.log(`FatSecret找到food_id: ${food_id.value}`);
+      
+      // 第二步：通过food_id获取详细食品信息
+      const food = await fatAPI.method("food.get", {
+        food_id: food_id.value,
+      });
+      
+      if (!food?.food) {
+        console.log('FatSecret未能获取食品详细信息');
+        return null;
+      }
+      
+      console.log('FatSecret获取到食品详细信息:', food.food.food_name);
+      
+      // 转换为标准格式
+      return this.convertDetailedFatSecretFood(food.food, barcode);
+    } catch (error) {
+      console.error('FatSecret条形码搜索失败:', error);
+      return null; // 返回null而不是抛出错误，让调用方处理
+    }
+  }
+  
+  /**
    * 将FatSecret食品数据转换为标准格式
    */
   static convertFatSecretFood(fatSecretFood) {
@@ -71,6 +111,73 @@ export class FatSecretService {
       };
     } catch (error) {
       console.error('转换FatSecret食品数据失败:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * 将FatSecret详细食品数据转换为标准格式（用于条形码搜索）
+   */
+  static convertDetailedFatSecretFood(fatSecretFood, barcode) {
+    try {
+      // 获取第一个serving信息（通常是默认serving）
+      let serving = fatSecretFood.servings?.serving;
+      
+      // 如果servings.serving是数组，取第一个
+      if (Array.isArray(serving)) {
+        serving = serving[0];
+      }
+      
+      if (!serving) {
+        throw new Error('FatSecret食品缺少serving信息');
+      }
+      
+      // 计算每100g的营养值
+      const metricAmount = parseFloat(serving.metric_serving_amount) || 100;
+      const metricUnit = serving.metric_serving_unit || 'g';
+      
+      // 转换为克数（如果是ml，按1:1转换）
+      let gramsPerServing = metricAmount;
+      if (metricUnit === 'ml') {
+        gramsPerServing = metricAmount * 1.03; // 液体密度约1.03
+      }
+      
+      // 计算每100g营养值
+      const multiplier = 100 / gramsPerServing;
+      
+      const nutrition = {
+        calories: Math.round((parseFloat(serving.calories) || 0) * multiplier),
+        carbs: Math.round((parseFloat(serving.carbohydrate) || 0) * multiplier * 10) / 10,
+        protein: Math.round((parseFloat(serving.protein) || 0) * multiplier * 10) / 10,
+        fat: Math.round((parseFloat(serving.fat) || 0) * multiplier * 10) / 10,
+        fiber: Math.round((parseFloat(serving.fiber) || 0) * multiplier * 10) / 10,
+        sugar: Math.round((parseFloat(serving.sugar) || 0) * multiplier * 10) / 10,
+        sodium: Math.round((parseFloat(serving.sodium) || 0) * multiplier * 10) / 10,
+      };
+      
+      return {
+        id: `fatsecret_${fatSecretFood.food_id}`,
+        name: fatSecretFood.food_name,
+        brand: fatSecretFood.brand_name || null,
+        kcal_per_100g: nutrition.calories,
+        carbs_per_100g: nutrition.carbs,
+        protein_per_100g: nutrition.protein,
+        fat_per_100g: nutrition.fat,
+        fiber_per_100g: nutrition.fiber,
+        sugar_per_100g: nutrition.sugar,
+        sodium_per_100g: nutrition.sodium,
+        serving_label: serving.serving_description || null,
+        grams_per_serving: gramsPerServing,
+        source: 'FATSECRET',
+        barcode: barcode,
+        category: fatSecretFood.food_type || 'FatSecret',
+        // 保留原始数据用于调试
+        original_food_id: fatSecretFood.food_id,
+        original_serving: serving,
+        food_url: fatSecretFood.food_url
+      };
+    } catch (error) {
+      console.error('转换FatSecret详细食品数据失败:', error);
       throw error;
     }
   }

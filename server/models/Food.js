@@ -91,6 +91,20 @@ export class Food {
     }
   }
 
+  static async findByBarcode(barcode) {
+    try {
+      const escapedBarcode = barcode.replace(/'/g, "''");
+      const sql = `SELECT * FROM foods WHERE barcode = '${escapedBarcode}'`;
+      console.log('执行 SQL (条形码查找):', sql);
+      
+      const foods = await executeQuery(sql);
+      return foods.length > 0 ? foods[0] : null;
+    } catch (error) {
+      console.error('条形码查找食物失败:', error);
+      throw error;
+    }
+  }
+
   static async create(foodData) {
     try {
       // 转义所有字符串字段
