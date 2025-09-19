@@ -1,7 +1,8 @@
 import fatsecret from 'fatsecret';
 
-const CONSUMER_KEY = "1f9ca294fbab490b9372dc9da5c09be3";
-const CONSUMER_SECRET = "1f62fc57ebf643a19fd5319cda587617";
+const CONSUMER_KEY = "d4e5af8c446f4fe8beb3c2d28d751c76";
+const CONSUMER_SECRET = "60f0657b4a864246b4d34a69ddb83027";
+
 
 const fatAPI = new fatsecret(CONSUMER_KEY, CONSUMER_SECRET);
 
